@@ -5,6 +5,7 @@
 //  Tests for PositionMapper.Configuration Codable conformance.
 //
 
+import Foundation
 import Testing
 @testable import VoiceKit
 

@@ -5,6 +5,7 @@
 //  Tests for the scored candidate matching algorithm in PositionMapper.
 //
 
+import Foundation
 import Testing
 @testable import VoiceKit
 
