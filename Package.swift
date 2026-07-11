@@ -14,10 +14,28 @@ let package = Package(
             name: "VoiceKit",
             targets: ["VoiceKit"]
         ),
+        .executable(
+            name: "Dictate",
+            targets: ["Dictate"]
+        ),
     ],
     targets: [
         .target(
             name: "VoiceKit",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
+        ),
+        .executableTarget(
+            name: "Dictate",
+            dependencies: ["VoiceKit"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
+        ),
+        .testTarget(
+            name: "DictateTests",
+            dependencies: ["Dictate"],
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ]
