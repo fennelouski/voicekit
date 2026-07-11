@@ -163,6 +163,7 @@ final class DictationController {
                 // Trailing space so back-to-back dictations don't run together.
                 if let last = text.last, !last.isWhitespace { text += " " }
                 TextInserter.insert(text)
+                DictationHistory.shared.add(text)
                 correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
             }
 

@@ -19,6 +19,7 @@ Requires macOS 26 to run and Xcode 26 to build. On first launch, grant **Accessi
 - A floating HUD shows mic level and the live transcript while you speak.
 - Filler words ("um", "uh", …) are stripped automatically. Cleanup has four modes in Settings: **Off**, **Apple Intelligence** (on-device polish), **Claude** — an opt-in, bring-your-own-key mode that sends the transcript (and nothing else) to the Anthropic API for frontier-grade rewriting — or **Custom local model** — any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, MLX, vLLM) via a base URL and model name, fully local. Custom instructions apply to both. The Claude key is stored in the Keychain; if any cleanup request fails, the local transcript is inserted unchanged.
 - **Learns from your edits**: fix a misheard word after insertion and Dictate notices (via Accessibility), remembers the correction, and applies it automatically once it has been seen twice — reverting a correction unlearns it. Learned pairs also steer the AI cleanup prompt. Each dictation appends one compact JSONL line (stats and correction pairs, never full transcripts) to `~/Library/Application Support/Dictate/learning-log.jsonl`, entirely on-device.
+- **⌃⌥⌘V**: pops up the last hour of dictations — click one to copy it to the clipboard, press Esc (or click elsewhere) to dismiss. History is in-memory only and clears when the app quits.
 - Settings: hotkey, language, microphone, cleanup mode, learning, launch at login.
 
 ## Installation
@@ -215,7 +216,7 @@ Your app must request microphone access:
 
 ## Privacy
 
-Recognition, filler-word cleanup, and correction learning are entirely on-device. Learned corrections (`corrections.json`) and the dictation log (`learning-log.jsonl`, stats and correction pairs only — never transcripts) live in `~/Library/Application Support/Dictate/`, never in this repo. The only network calls are the two opt-in cleanup modes: **Claude** (your API key, stored in the Keychain) and **Custom local model** (your server). Both receive the transcript and nothing else, and both are off by default.
+Recognition, filler-word cleanup, and correction learning are entirely on-device. The recent-dictations history (⌃⌥⌘V) is held in memory only and is gone when the app quits. Learned corrections (`corrections.json`) and the dictation log (`learning-log.jsonl`, stats and correction pairs only — never transcripts) live in `~/Library/Application Support/Dictate/`, never in this repo. The only network calls are the two opt-in cleanup modes: **Claude** (your API key, stored in the Keychain) and **Custom local model** (your server). Both receive the transcript and nothing else, and both are off by default.
 
 ## Roadmap
 

@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let controller = DictationController()
     private let hotkeyMonitor = HotkeyMonitor()
+    private let historyPanel = HistoryPanelController()
     private var settingsController: SettingsWindowController?
     private var onboardingController: OnboardingWindowController?
     private var toggleMenuItem: NSMenuItem!
@@ -49,6 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor.hotkey = Settings.hotkey
         hotkeyMonitor.start()
 
+        HistoryHotkey.register { [weak self] in self?.historyPanel.toggle() }
+
         NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -72,6 +75,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleMenuItem = NSMenuItem(title: "Start Dictation", action: #selector(toggleDictation), keyEquivalent: "d")
         toggleMenuItem.target = self
         menu.addItem(toggleMenuItem)
+        let historyItem = NSMenuItem(title: "Recent Dictations", action: #selector(showHistory), keyEquivalent: "v")
+        historyItem.keyEquivalentModifierMask = [.control, .option, .command]
+        historyItem.target = self
+        menu.addItem(historyItem)
         menu.addItem(.separator())
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
@@ -93,6 +100,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleDictation() {
         controller.toggleManual()
+    }
+
+    @objc private func showHistory() {
+        historyPanel.toggle()
     }
 
     /// Post-onboarding launches: quietly prompt for anything still missing.
