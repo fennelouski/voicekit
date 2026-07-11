@@ -9,6 +9,7 @@
 
 @preconcurrency import AVFoundation
 import Foundation
+import os
 import Speech
 #if os(macOS)
 import CoreAudio
@@ -24,6 +25,8 @@ import AudioUnit
 ///   guarded with `@available`.
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
 public actor SpeechRecognitionService: TranscriptionProvider {
+    private static let logger = Logger(subsystem: "VoiceKit", category: "SpeechRecognitionService")
+
     // MARK: - SpeechAnalyzer pipeline state
 
     private var transcriber: SpeechTranscriber?
@@ -180,11 +183,11 @@ public actor SpeechRecognitionService: TranscriptionProvider {
                     let text = String(result.text.characters)
                     let isFinal = result.isFinal
                     guard !text.isEmpty else { continue }
-                    print("[SpeechRecognition] segment: \"\(text)\" isFinal: \(isFinal)")
+                    Self.logger.debug("segment: \"\(text, privacy: .private)\" isFinal: \(isFinal)")
                     capturedTranscriptCont?.yield(TranscriptionResult(text: text, isFinal: isFinal))
                 }
             } catch {
-                print("[SpeechRecognition] results stream error: \(error)")
+                Self.logger.error("results stream error: \(error)")
             }
             capturedTranscriptCont?.finish()
         }
@@ -214,7 +217,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
                     let converted = try converter.convertBuffer(buffer, to: targetFormat)
                     inputBuilder.yield(AnalyzerInput(buffer: converted))
                 } catch {
-                    print("[SpeechRecognition] buffer conversion error: \(error)")
+                    Self.logger.error("buffer conversion error: \(error)")
                 }
             }
 
@@ -280,8 +283,16 @@ public actor SpeechRecognitionService: TranscriptionProvider {
             try? await analyzer.finalizeAndFinishThroughEndOfInput()
         }
 
-        // Cancel results task
-        resultsTask?.cancel()
+        // Drain remaining results so the last committed segment isn't dropped.
+        // Bounded: cancel the results task if it hasn't finished within 2 seconds.
+        if let task = resultsTask {
+            let timeout = Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                task.cancel()
+            }
+            try? await task.value
+            timeout.cancel()
+        }
         resultsTask = nil
 
         // Finish transcript, level, and audio buffer streams
