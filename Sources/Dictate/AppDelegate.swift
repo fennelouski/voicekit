@@ -14,17 +14,17 @@ import VoiceKit
 @available(macOS 26.0, *)
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem!
+    private var statusItem: NSStatusItem?
     private let controller = DictationController()
     private let hotkeyMonitor = HotkeyMonitor()
     private let historyPanel = HistoryPanelController()
     private var settingsController: SettingsWindowController?
     private var onboardingController: OnboardingWindowController?
-    private var toggleMenuItem: NSMenuItem!
-    private var hintMenuItem: NSMenuItem!
+    private var toggleMenuItem: NSMenuItem?
+    private var hintMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        setUpStatusItem()
+        updateStatusItemVisibility()
 
         if Settings.onboardingComplete {
             promptForPermissionsIfNeeded()
@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         controller.onListeningChange = { [weak self] listening in
             self?.updateStatusIcon(listening: listening)
-            self?.toggleMenuItem.title = listening ? "Stop Dictation" : "Start Dictation"
+            self?.toggleMenuItem?.title = listening ? "Stop Dictation" : "Start Dictation"
         }
 
         hotkeyMonitor.onKeyDown = { [weak self] in self?.controller.hotkeyDown() }
@@ -58,9 +58,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.hotkeyMonitor.hotkey = Settings.hotkey
-                self.hintMenuItem.title = "Hold \(Settings.hotkey.displayName) to dictate"
+                self.hintMenuItem?.title = "Hold \(Settings.hotkey.displayName) to dictate"
+                self.updateStatusItemVisibility()
             }
         }
+    }
+
+    /// The icon is optional: hotkeys keep working without it, and reopening
+    /// the app (Finder, Spotlight) brings up Settings to get back in.
+    private func updateStatusItemVisibility() {
+        if Settings.showMenuBarIcon {
+            if statusItem == nil { setUpStatusItem() }
+        } else if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+            toggleMenuItem = nil
+            hintMenuItem = nil
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !Settings.showMenuBarIcon {
+            showSettings()
+        }
+        return true
     }
 
     private func setUpStatusItem() {
@@ -68,13 +89,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusIcon(listening: false)
 
         let menu = NSMenu()
-        hintMenuItem = NSMenuItem(title: "Hold \(Settings.hotkey.displayName) to dictate", action: nil, keyEquivalent: "")
-        hintMenuItem.isEnabled = false
-        menu.addItem(hintMenuItem)
+        let hint = NSMenuItem(title: "Hold \(Settings.hotkey.displayName) to dictate", action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        menu.addItem(hint)
+        hintMenuItem = hint
         menu.addItem(.separator())
-        toggleMenuItem = NSMenuItem(title: "Start Dictation", action: #selector(toggleDictation), keyEquivalent: "d")
-        toggleMenuItem.target = self
-        menu.addItem(toggleMenuItem)
+        let toggle = NSMenuItem(title: "Start Dictation", action: #selector(toggleDictation), keyEquivalent: "d")
+        toggle.target = self
+        menu.addItem(toggle)
+        toggleMenuItem = toggle
         let historyItem = NSMenuItem(title: "Recent Dictations", action: #selector(showHistory), keyEquivalent: "v")
         historyItem.keyEquivalentModifierMask = [.control, .option, .command]
         historyItem.target = self
@@ -88,14 +111,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(welcomeItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Dictate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        statusItem.menu = menu
+        statusItem?.menu = menu
     }
 
     private func updateStatusIcon(listening: Bool) {
         let name = listening ? "mic.fill" : "mic"
         let image = NSImage(systemSymbolName: name, accessibilityDescription: "Dictate")
         image?.isTemplate = true
-        statusItem.button?.image = image
+        statusItem?.button?.image = image
     }
 
     @objc private func toggleDictation() {

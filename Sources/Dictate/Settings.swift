@@ -84,6 +84,7 @@ enum Settings {
     static let localModelNameKey = "dictate_localModelName"
     static let claudeAPIKeyAccount = "anthropic-api-key"
     static let onboardingCompleteKey = "dictate_onboardingComplete"
+    static let showMenuBarIconKey = "dictate_showMenuBarIcon"
     static let learningEnabledKey = "dictate_learningEnabled"
     /// Pre-cloud boolean toggle; read only to migrate into cleanupMode.
     static let legacyAICleanupKey = "dictate_aiCleanup"
@@ -128,6 +129,11 @@ enum Settings {
 
     static var onboardingComplete: Bool {
         UserDefaults.standard.bool(forKey: onboardingCompleteKey)
+    }
+
+    /// Default on. Hotkeys work without it; reopening the app shows Settings.
+    static var showMenuBarIcon: Bool {
+        UserDefaults.standard.object(forKey: showMenuBarIconKey) as? Bool ?? true
     }
 
     /// Learn corrections from how the user edits inserted text. Default on.

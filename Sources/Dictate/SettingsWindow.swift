@@ -39,6 +39,7 @@ struct SettingsView: View {
     @AppStorage(Settings.localModelBaseURLKey) private var localBaseURL = "http://localhost:11434/v1"
     @AppStorage(Settings.localModelNameKey) private var localModelName = ""
     @AppStorage(Settings.learningEnabledKey) private var learningEnabled = true
+    @AppStorage(Settings.showMenuBarIconKey) private var showMenuBarIcon = true
 
     @State private var apiKey = Settings.claudeAPIKey ?? ""
     @State private var keyTest = KeyTestState.idle
@@ -157,6 +158,12 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
+                if !showMenuBarIcon {
+                    Text("Hotkeys keep working without the icon. To get back to Settings, open Dictate again from Finder or Spotlight.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
                         do {
