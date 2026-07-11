@@ -206,7 +206,7 @@ Your app must request microphone access:
 
 ## Troubleshooting
 
-**I spoke, released the key, and nothing was inserted.** A quick tap (under ~0.35 s) locks dictation **on** — hands-free mode, shown by a lock icon in the pill. Tap the hotkey again to stop and insert. Holding the key inserts on release, as expected.
+**I spoke, released the key, and nothing was inserted.** A quick tap (under ~0.35 s) locks dictation **on** — hands-free mode, shown by a lock icon in the pill. Tap the hotkey again to stop and insert. Holding the key inserts on release.
 
 **macOS asks for permissions again after every rebuild.** Permission grants are tied to the app's code signature, and ad-hoc signatures change on every build. `Scripts/make-app.sh` signs with your Apple Development (or Developer ID) certificate when one is present, so grants survive rebuilds. If it prints `Signed ad-hoc (no Apple Development identity found)`, sign into Xcode → Settings → Accounts to get a free development certificate, then rebuild.
 
