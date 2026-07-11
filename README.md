@@ -4,13 +4,30 @@ On-device speech recognition and audio input for Apple platforms. Wraps Apple's 
 
 No audio or transcript leaves the device.
 
+## Dictate — the app
+
+This repo also ships **Dictate**, a macOS menu bar app built on VoiceKit: hold **Fn** anywhere, speak, release — your words are typed into whatever app has focus. Like Wispr Flow, but 100% on-device.
+
+```sh
+Scripts/make-app.sh && open build/Dictate.app
+```
+
+Requires macOS 26 to run and Xcode 26 to build. On first launch, grant **Accessibility** (for the global hotkey and paste), **Microphone**, and **Speech Recognition** when prompted. Then set System Settings → Keyboard → "Press 🌐 key to" → **Do Nothing**, so Apple's built-in dictation doesn't fight the Fn hotkey.
+
+- **Hold Fn** (or Right ⌘, configurable): push-to-talk — release to insert.
+- **Quick tap**: locks dictation on; tap again to stop and insert.
+- A floating HUD shows mic level and the live transcript while you speak.
+- Filler words ("um", "uh", …) are stripped automatically. Cleanup has four modes in Settings: **Off**, **Apple Intelligence** (on-device polish), **Claude** — an opt-in, bring-your-own-key mode that sends the transcript (and nothing else) to the Anthropic API for frontier-grade rewriting — or **Custom local model** — any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, MLX, vLLM) via a base URL and model name, fully local. Custom instructions apply to both. The Claude key is stored in the Keychain; if any cleanup request fails, the local transcript is inserted unchanged.
+- **Learns from your edits**: fix a misheard word after insertion and Dictate notices (via Accessibility), remembers the correction, and applies it automatically once it has been seen twice — reverting a correction unlearns it. Learned pairs also steer the AI cleanup prompt. Each dictation appends one compact JSONL line (stats and correction pairs, never full transcripts) to `~/Library/Application Support/Dictate/learning-log.jsonl`, entirely on-device.
+- Settings: hotkey, language, microphone, cleanup mode, learning, launch at login.
+
 ## Installation
 
 Add VoiceKit via Swift Package Manager:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/nathanfennel/VoiceKit.git", from: "1.0.0"),
+    .package(url: "https://github.com/fennelouski/voicekit.git", branch: "main"),
 ]
 ```
 
@@ -60,15 +77,13 @@ let speechService = SpeechRecognitionService()
 let session = try await speechService.startRecognition()
 
 for await segment in session.transcript {
-    // Fast path: nonisolated, no actor hop — sub-millisecond UI updates
-    let estimated = mapper.estimatePosition(
-        for: segment.text,
-        afterCharPosition: currentPosition
-    )
+    let timestamp = ProcessInfo.processInfo.systemUptime
+
+    // Optimistic estimate for immediate highlighting; doesn't advance state
+    let estimated = await mapper.estimatePosition(for: segment.text, timestamp: timestamp)
     highlightUpTo(estimated)
 
-    // Slow path: conservative match confirms position on the actor
-    let timestamp = ProcessInfo.processInfo.systemUptime
+    // Conservative match: advances only on confirmed matches
     if let confirmed = await mapper.processSegment(segment.text, timestamp: timestamp) {
         highlightUpTo(confirmed)
     }
@@ -125,6 +140,8 @@ Task {
 | `RecognitionSession` | Returned by `startRecognition()`. Contains `transcript`, `level`, and `audioBuffers` streams. |
 | `TranscriptionResult` | A recognized segment: `text`, `isFinal`, optional `confidence`. |
 | `RecognitionError` | Error cases: `notAuthorized`, `localeNotSupported`, `engineStartFailed`, etc. |
+| `TranscriptAccumulator` | Folds a result stream into text: finals accumulate, volatile overlays for live preview. |
+| `TranscriptCleaner` | Strips filler words and repairs capitalization for dictated text. |
 
 ### Tracking
 
@@ -133,6 +150,13 @@ Task {
 | `PositionMapper` | Actor mapping transcript words to character positions in a script. Scored candidate matching with context awareness. |
 | `PositionMapper.Configuration` | Tuning parameters: windows, thresholds, filler words. Conforms to `Codable`. |
 | `SentenceMapper` | Detects sentence boundaries for keyboard navigation. |
+
+### Learning
+
+| Type | Description |
+|------|-------------|
+| `CorrectionExtractor` | Word-diffs inserted text against the user's edited version, yielding `Correction` pairs. |
+| `CorrectionStore` | Persisted correction counts: applies pairs seen twice, unlearns reverted ones, feeds prompt hints. |
 
 ### Audio
 
@@ -161,7 +185,7 @@ Your app must request microphone access:
 <true/>
 ```
 
-**iOS** (`Info.plist`):
+**Info.plist** (iOS; also required for macOS apps, sandboxed or not):
 ```xml
 <key>NSMicrophoneUsageDescription</key>
 <string>Used for voice input</string>
@@ -179,6 +203,24 @@ Your app must request microphone access:
 | Model download failed | `.modelDownloadFailed` | Retry or check network |
 | Stream ends | Stream completes | Restart recognition in a loop |
 
+## Troubleshooting
+
+**I spoke, released the key, and nothing was inserted.** A quick tap (under ~0.35 s) locks dictation **on** — hands-free mode, shown by a lock icon in the pill. Tap the hotkey again to stop and insert. Holding the key inserts on release, as expected.
+
+**macOS asks for permissions again after every rebuild.** Permission grants are tied to the app's code signature, and ad-hoc signatures change on every build. `Scripts/make-app.sh` signs with your Apple Development (or Developer ID) certificate when one is present, so grants survive rebuilds. If it prints `Signed ad-hoc (no Apple Development identity found)`, sign into Xcode → Settings → Accounts to get a free development certificate, then rebuild.
+
+**"Dictate.app can't be opened" (Gatekeeper).** Apps you build locally aren't quarantined and open normally. A pre-built copy from someone else isn't notarized: right-click the app → Open → Open to run it anyway.
+
+**The hotkey does nothing.** The global key monitor needs Accessibility permission and only works after it's granted. If you granted it directly in System Settings (outside Dictate's onboarding), quit and relaunch Dictate.
+
+## Privacy
+
+Recognition, filler-word cleanup, and correction learning are entirely on-device. Learned corrections (`corrections.json`) and the dictation log (`learning-log.jsonl`, stats and correction pairs only — never transcripts) live in `~/Library/Application Support/Dictate/`, never in this repo. The only network calls are the two opt-in cleanup modes: **Claude** (your API key, stored in the Keychain) and **Custom local model** (your server). Both receive the transcript and nothing else, and both are off by default.
+
+## Roadmap
+
+Not here yet: screenshots/demo GIF, notarized releases, Homebrew cask, CONTRIBUTING.md.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
