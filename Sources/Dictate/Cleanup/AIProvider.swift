@@ -30,7 +30,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
         case .gemini: return "Google Gemini"
         case .groq: return "Groq"
         case .openRouter: return "OpenRouter"
-        case .local: return "your local model"
+        case .local: return String(localized: "your local model")
         }
     }
 
@@ -97,9 +97,9 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var privacyNote: String {
         switch self {
         case .local:
-            return "Works with any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, MLX, vLLM. Everything stays on your machine; if the request fails, your transcript is inserted unchanged."
+            return String(localized: "Works with any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, MLX, vLLM. Everything stays on your machine; if the request fails, your transcript is inserted unchanged.")
         default:
-            return "Your key is stored in the Keychain, never in preferences. Transcripts are sent to \(displayName) to be cleaned; audio and transcription stay on this Mac. If the request fails, your transcript is inserted unchanged."
+            return String(format: String(localized: "Your key is stored in the Keychain, never in preferences. Transcripts are sent to %@ to be cleaned; audio and transcription stay on this Mac. If the request fails, your transcript is inserted unchanged."), displayName)
         }
     }
 }

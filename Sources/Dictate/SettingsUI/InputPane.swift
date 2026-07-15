@@ -45,7 +45,7 @@ struct InputPane: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                SettingsLabel("Language & Microphone", systemImage: "mic", tint: SettingsTint.input)
+                SettingsLabel(String(localized: "Language & Microphone"), systemImage: "mic", tint: SettingsTint.input)
             }
         }
         .formStyle(.grouped)

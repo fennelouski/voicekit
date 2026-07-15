@@ -47,9 +47,9 @@ struct CleanupPane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "Tried top to bottom. The first step that works cleans your text.",
-                    title: "Cleanup Chain",
-                    explanation: """
+                    caption: String(localized: "Tried top to bottom. The first step that works cleans your text."),
+                    title: String(localized: "Cleanup Chain"),
+                    explanation: String(localized: """
                         Cleanup punctuates, capitalizes, and resolves the false starts you make \
                         when you change your mind mid-sentence. ("Um" and "uh" are stripped no \
                         matter what — that costs nothing and never needs a model.)
@@ -68,11 +68,11 @@ struct CleanupPane: View {
 
                         You only ever see "cleanup failed" if *every* step failed — and even then \
                         your transcript is inserted unchanged rather than lost.
-                        """,
+                        """),
                     value: Binding(get: { chain }, set: { chainRaw = Settings.encodeChain($0) })
                 ) { CleanupChainDemo(chain: $0) }
             } header: {
-                SettingsLabel("Cleanup Chain", systemImage: "wand.and.sparkles", tint: SettingsTint.cleanup)
+                SettingsLabel(String(localized: "Cleanup Chain"), systemImage: "wand.and.sparkles", tint: SettingsTint.cleanup)
             }
 
             // One config block per provider actually in the chain, in the order they run.
@@ -83,12 +83,12 @@ struct CleanupPane: View {
             if chain.contains(.onDevice) {
                 Section {
                     Text(AICleanup.isAvailable
-                         ? "Polishes punctuation and removes false starts, entirely on this Mac. Free, and needs no key."
-                         : "Apple Intelligence isn't available on this Mac, so this step will always be skipped.")
+                         ? String(localized: "Polishes punctuation and removes false starts, entirely on this Mac. Free, and needs no key.")
+                         : String(localized: "Apple Intelligence isn't available on this Mac, so this step will always be skipped."))
                         .font(.caption)
                         .foregroundStyle(AICleanup.isAvailable ? Color.secondary : Color.orange)
                 } header: {
-                    SettingsLabel("Apple Intelligence", systemImage: "apple.logo", tint: SettingsTint.cleanup)
+                    SettingsLabel(String(localized: "Apple Intelligence"), systemImage: "apple.logo", tint: SettingsTint.cleanup)
                 }
             }
 
@@ -100,7 +100,7 @@ struct CleanupPane: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } header: {
-                    SettingsLabel("Instructions", systemImage: "text.quote", tint: SettingsTint.cleanup)
+                    SettingsLabel(String(localized: "Instructions"), systemImage: "text.quote", tint: SettingsTint.cleanup)
                 }
             }
         }
@@ -147,13 +147,13 @@ struct CleanupPane: View {
     private func warning(for step: CleanupMode) -> String? {
         switch step {
         case .onDevice:
-            return AICleanup.isAvailable ? nil : "unavailable"
+            return AICleanup.isAvailable ? nil : String(localized: "unavailable")
         case .local:
-            return Settings.model(for: .local).isEmpty ? "no model set" : nil
+            return Settings.model(for: .local).isEmpty ? String(localized: "no model set") : nil
         default:
             guard let provider = step.provider else { return nil }
             let key = Settings.apiKey(for: provider) ?? ""
-            return key.isEmpty ? "no key — will be skipped" : nil
+            return key.isEmpty ? String(localized: "no key — will be skipped") : nil
         }
     }
 
@@ -263,7 +263,7 @@ private struct ProviderConfigSection: View {
     @ViewBuilder
     private var testRow: some View {
         HStack {
-            Button(provider.requiresKey ? "Test key" : "Test connection") { runTest() }
+            Button(provider.requiresKey ? String(localized: "Test key") : String(localized: "Test connection")) { runTest() }
                 .disabled(!configured || isTesting)
             switch test {
             case .idle:

@@ -297,7 +297,7 @@ struct HUDView: View {
 
     private var displayText: String {
         let text = model.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? "Listening…" : String(text.suffix(60))
+        return text.isEmpty ? String(localized: "Listening…") : String(text.suffix(60))
     }
 }
 

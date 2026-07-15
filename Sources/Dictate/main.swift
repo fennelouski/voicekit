@@ -18,8 +18,8 @@ if #available(macOS 26.0, *) {
     }
 } else {
     let alert = NSAlert()
-    alert.messageText = "Dictate requires macOS 26"
-    alert.informativeText = "On-device speech recognition (SpeechTranscriber) is only available on macOS 26 or later."
+    alert.messageText = String(localized: "Dictate requires macOS 26")
+    alert.informativeText = String(localized: "On-device speech recognition (SpeechTranscriber) is only available on macOS 26 or later.")
     alert.runModal()
     exit(1)
 }

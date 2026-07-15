@@ -46,7 +46,7 @@ struct SettingInfoButton<Value: Equatable, Demo: View>: View {
         }
         // Without .plain the button's hit area swallows the whole Form row.
         .buttonStyle(.plain)
-        .accessibilityLabel("Learn more about \(title)")
+        .accessibilityLabel(String(format: String(localized: "Learn more about %@"), title))
         .popover(isPresented: $showing, arrowEdge: .trailing) {
             SettingInfoPopover(title: title, explanation: explanation, value: $value, demo: demo)
         }

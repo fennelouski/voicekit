@@ -200,7 +200,7 @@ final class DictationController {
             self.pendingCleanups -= 1
             guard self.pendingCleanups == 0, !self.isListening, !self.isStarting else { return }
             if failed {
-                self.hud.showError("Cleanup failed — inserted as-is")
+                self.hud.showError(String(localized: "Cleanup failed — inserted as-is"))
             } else {
                 self.hud.hide()
             }
@@ -243,22 +243,22 @@ final class DictationController {
             if let device = devices.first(where: { $0.id == selected }) {
                 return device.name
             }
-            return "Selected device unavailable (id \(selected))"
+            return String(format: String(localized: "Selected device unavailable (id %@)"), selected)
         }
-        let name = AVCaptureDevice.default(for: .audio)?.localizedName ?? "unknown"
-        return "\(name) (system default)"
+        let name = AVCaptureDevice.default(for: .audio)?.localizedName ?? String(localized: "unknown")
+        return String(format: String(localized: "%@ (system default)"), name)
     }
 
     private static func message(for error: Error) -> String {
         switch error {
         case RecognitionError.notAuthorized:
-            return "Permission needed — enable Microphone and Speech Recognition in System Settings"
+            return String(localized: "Permission needed — enable Microphone and Speech Recognition in System Settings")
         case RecognitionError.localeNotSupported:
-            return "Selected language isn't supported for on-device recognition"
+            return String(localized: "Selected language isn't supported for on-device recognition")
         case RecognitionError.modelDownloadFailed:
-            return "Speech model download failed — check your connection and retry"
+            return String(localized: "Speech model download failed — check your connection and retry")
         default:
-            return "Couldn't start dictation"
+            return String(localized: "Couldn't start dictation")
         }
     }
 }

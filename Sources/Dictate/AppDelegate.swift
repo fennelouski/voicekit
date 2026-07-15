@@ -46,7 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         controller.onListeningChange = { [weak self] listening in
             self?.updateStatusIcon(listening: listening)
-            self?.toggleMenuItem?.title = listening ? "Stop Dictation" : "Start Dictation"
+            self?.toggleMenuItem?.title = listening
+                ? String(localized: "Stop Dictation")
+                : String(localized: "Start Dictation")
         }
 
         hotkeyMonitor.onKeyDown = { [weak self] in self?.controller.hotkeyDown() }
@@ -69,7 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.hotkeyMonitor.hotkey = Settings.hotkey
-                self.hintMenuItem?.title = "Hold \(Settings.hotkey.displayName) to dictate"
+                self.hintMenuItem?.title = String(
+                    format: String(localized: "Hold %@ to dictate"), Settings.hotkey.displayName
+                )
                 self.updateStatusItemVisibility()
             }
         }
@@ -127,34 +131,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusIcon(listening: false)
 
         let menu = NSMenu()
-        let hint = NSMenuItem(title: "Hold \(Settings.hotkey.displayName) to dictate", action: nil, keyEquivalent: "")
+        let hint = NSMenuItem(
+            title: String(format: String(localized: "Hold %@ to dictate"), Settings.hotkey.displayName),
+            action: nil, keyEquivalent: ""
+        )
         hint.isEnabled = false
         menu.addItem(hint)
         hintMenuItem = hint
         menu.addItem(.separator())
-        let toggle = NSMenuItem(title: "Start Dictation", action: #selector(toggleDictation), keyEquivalent: "d")
+        let toggle = NSMenuItem(title: String(localized: "Start Dictation"), action: #selector(toggleDictation), keyEquivalent: "d")
         toggle.target = self
         menu.addItem(toggle)
         toggleMenuItem = toggle
-        let historyItem = NSMenuItem(title: "Recent Dictations", action: #selector(showHistory), keyEquivalent: "v")
+        let historyItem = NSMenuItem(title: String(localized: "Recent Dictations"), action: #selector(showHistory), keyEquivalent: "v")
         historyItem.keyEquivalentModifierMask = [.control, .option, .command]
         historyItem.target = self
         menu.addItem(historyItem)
         menu.addItem(.separator())
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: String(localized: "Settings…"), action: #selector(showSettings), keyEquivalent: ",")
         // Advertise the global shortcut, not ⌘, — that's the one that still works once the
         // icon (and this menu) are gone.
         settingsItem.keyEquivalentModifierMask = [.control, .option, .command]
         settingsItem.target = self
         menu.addItem(settingsItem)
-        let welcomeItem = NSMenuItem(title: "Welcome Guide…", action: #selector(showWelcomeGuide), keyEquivalent: "")
+        let welcomeItem = NSMenuItem(title: String(localized: "Welcome Guide…"), action: #selector(showWelcomeGuide), keyEquivalent: "")
         welcomeItem.target = self
         menu.addItem(welcomeItem)
-        let termsItem = NSMenuItem(title: "Terms of Service…", action: #selector(showTermsReadOnly), keyEquivalent: "")
+        let termsItem = NSMenuItem(title: String(localized: "Terms of Service…"), action: #selector(showTermsReadOnly), keyEquivalent: "")
         termsItem.target = self
         menu.addItem(termsItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Dictate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: String(localized: "Quit Dictate"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
     }
 

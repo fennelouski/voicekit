@@ -19,7 +19,7 @@ enum Hotkey: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .fn: return "Fn"
-        case .rightCommand: return "Right ⌘"
+        case .rightCommand: return String(localized: "Right ⌘")
         }
     }
 
@@ -50,11 +50,11 @@ enum HUDStyle: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .bars: return "Level bars"
-        case .orb: return "Voice orb"
-        case .wave: return "Waveform"
-        case .ripple: return "Sonar ripple"
-        case .halo: return "Breathing halo"
+        case .bars: return String(localized: "Level bars")
+        case .orb: return String(localized: "Voice orb")
+        case .wave: return String(localized: "Waveform")
+        case .ripple: return String(localized: "Sonar ripple")
+        case .halo: return String(localized: "Breathing halo")
         }
     }
 }
@@ -91,9 +91,18 @@ enum HUDPosition: String, CaseIterable, Identifiable {
     }
 
     var displayName: String {
-        let rows = ["Top", "Middle", "Bottom"]
-        let columns = ["left", "centre", "right"]
-        return column == 1 && row == 1 ? "Centre" : "\(rows[row]) \(columns[column])"
+        // Whole phrases, not composed from "Top"/"left": word order and casing vary by language.
+        switch self {
+        case .topLeft: return String(localized: "Top left")
+        case .topCenter: return String(localized: "Top centre")
+        case .topRight: return String(localized: "Top right")
+        case .centerLeft: return String(localized: "Middle left")
+        case .center: return String(localized: "Centre")
+        case .centerRight: return String(localized: "Middle right")
+        case .bottomLeft: return String(localized: "Bottom left")
+        case .bottomCenter: return String(localized: "Bottom centre")
+        case .bottomRight: return String(localized: "Bottom right")
+        }
     }
 }
 
@@ -114,10 +123,10 @@ enum HUDTextSize: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .small: return "Small"
-        case .medium: return "Medium"
-        case .large: return "Large"
-        case .extraLarge: return "Extra Large"
+        case .small: return String(localized: "Small")
+        case .medium: return String(localized: "Medium")
+        case .large: return String(localized: "Large")
+        case .extraLarge: return String(localized: "Extra Large")
         }
     }
 }
@@ -142,22 +151,22 @@ enum HUDSpeed: String, CaseIterable, Identifiable {
     /// How the state transitions read.
     var displayName: String {
         switch self {
-        case .instant: return "Instant"
-        case .fast: return "Fast"
-        case .normal: return "Normal"
-        case .slow: return "Slow"
-        case .slowMo: return "Slow-mo"
+        case .instant: return String(localized: "Instant")
+        case .fast: return String(localized: "Fast")
+        case .normal: return String(localized: "Normal")
+        case .slow: return String(localized: "Slow")
+        case .slowMo: return String(localized: "Slow-mo")
         }
     }
 
     /// How the transcript reveal reads — same scale, friendlier names for words landing.
     var revealName: String {
         switch self {
-        case .instant: return "ASAP"
-        case .fast: return "Quick"
-        case .normal: return "Natural"
-        case .slow: return "Leisurely"
-        case .slowMo: return "Slow-mo"
+        case .instant: return String(localized: "ASAP")
+        case .fast: return String(localized: "Quick")
+        case .normal: return String(localized: "Natural")
+        case .slow: return String(localized: "Leisurely")
+        case .slowMo: return String(localized: "Slow-mo", comment: "Transcript reveal speed (reuses the Slow-mo label)")
         }
     }
 }
@@ -180,23 +189,23 @@ enum CleanupMode: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .off: return "Off"
-        case .onDevice: return "Apple Intelligence (on-device)"
-        case .claude: return "Claude (your API key)"
-        case .openAI: return "OpenAI (your API key)"
-        case .gemini: return "Google Gemini (your API key)"
-        case .groq: return "Groq (your API key)"
-        case .openRouter: return "OpenRouter (your API key)"
-        case .local: return "Custom local model"
+        case .off: return String(localized: "Off")
+        case .onDevice: return String(localized: "Apple Intelligence (on-device)")
+        case .claude: return String(localized: "Claude (your API key)")
+        case .openAI: return String(localized: "OpenAI (your API key)")
+        case .gemini: return String(localized: "Google Gemini (your API key)")
+        case .groq: return String(localized: "Groq (your API key)")
+        case .openRouter: return String(localized: "OpenRouter (your API key)")
+        case .local: return String(localized: "Custom local model")
         }
     }
 
     /// Short enough to read in a numbered list.
     var chainName: String {
         switch self {
-        case .off: return "Off"
-        case .onDevice: return "Apple Intelligence"
-        case .local: return "Custom local model"
+        case .off: return String(localized: "Off")
+        case .onDevice: return String(localized: "Apple Intelligence")
+        case .local: return String(localized: "Custom local model")
         default: return provider?.displayName ?? rawValue
         }
     }
@@ -225,9 +234,9 @@ enum ClaudeModel: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .opus: return "Claude Opus 4.8 — best quality"
-        case .sonnet: return "Claude Sonnet 5 — balanced"
-        case .haiku: return "Claude Haiku 4.5 — fastest"
+        case .opus: return String(localized: "Claude Opus 4.8 — best quality")
+        case .sonnet: return String(localized: "Claude Sonnet 5 — balanced")
+        case .haiku: return String(localized: "Claude Haiku 4.5 — fastest")
         }
     }
 }

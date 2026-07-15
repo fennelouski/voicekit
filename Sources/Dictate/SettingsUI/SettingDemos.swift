@@ -393,14 +393,14 @@ func cleanupDemoResult(_ mode: CleanupMode) -> String {
 func cleanupDemoNote(_ mode: CleanupMode) -> String {
     switch mode {
     case .off:
-        return "Filler words go; everything else lands exactly as you said it."
+        return String(localized: "Filler words go; everything else lands exactly as you said it.")
     case .onDevice:
-        return "Punctuation and false starts fixed, entirely on this Mac."
+        return String(localized: "Punctuation and false starts fixed, entirely on this Mac.")
     case .local:
-        return "Same, on a model you host yourself. Nothing leaves your machine."
+        return String(localized: "Same, on a model you host yourself. Nothing leaves your machine.")
     default:
-        let name = mode.provider?.displayName ?? "the provider"
-        return "Same, plus any custom instructions you give it. The transcript goes to \(name); a typical dictation costs a fraction of a cent."
+        let name = mode.provider?.displayName ?? String(localized: "the provider")
+        return String(format: String(localized: "Same, plus any custom instructions you give it. The transcript goes to %@; a typical dictation costs a fraction of a cent."), name)
     }
 }
 
@@ -419,7 +419,7 @@ struct CleanupChainDemo: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
-                demoCaption("You said")
+                demoCaption(String(localized: "You said"))
                 Text(cleanupDemoSample)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -438,7 +438,7 @@ struct CleanupChainDemo: View {
 
                 Divider()
 
-                demoCaption("Dictate inserts")
+                demoCaption(String(localized: "Dictate inserts"))
                 Text(cleanupDemoResult(winner ?? .off))
                     .font(.callout)
                     .fontWeight(.medium)
@@ -466,11 +466,11 @@ struct CleanupChainDemo: View {
         if isWinner {
             icon = "checkmark.circle.fill"
             tint = .green
-            note = "cleans your text"
+            note = String(localized: "cleans your text")
         } else if !reached {
             icon = "minus.circle"
             tint = .secondary
-            note = "not needed"
+            note = String(localized: "not needed")
         } else {
             icon = "arrow.turn.down.right"
             tint = .orange
@@ -508,9 +508,9 @@ struct CleanupChainDemo: View {
 
     private func skipReason(_ step: CleanupMode) -> String {
         switch step {
-        case .onDevice: return "unavailable on this Mac — skipped"
-        case .local: return "no model set — skipped"
-        default: return "no API key — skipped"
+        case .onDevice: return String(localized: "unavailable on this Mac — skipped")
+        case .local: return String(localized: "no model set — skipped")
+        default: return String(localized: "no API key — skipped")
         }
     }
 }
@@ -521,7 +521,7 @@ struct CleanupModeDemo: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
-                demoCaption("You said")
+                demoCaption(String(localized: "You said"))
                 Text(cleanupDemoSample)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -531,7 +531,7 @@ struct CleanupModeDemo: View {
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
 
-                demoCaption("Dictate inserts")
+                demoCaption(String(localized: "Dictate inserts"))
                 Text(cleanupDemoResult(mode))
                     .font(.callout)
                     .fontWeight(.medium)
@@ -568,14 +568,14 @@ struct LearningDemo: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 12) {
-                beat("You said", "\"open cloud code\"", icon: "mic.fill", tint: .secondary)
-                beat("Dictate inserted", "open cloud code", icon: "text.cursor", tint: .secondary)
-                beat("You fixed it to", "open Claude Code", icon: "pencil", tint: .orange)
+                beat(String(localized: "You said"), "\"open cloud code\"", icon: "mic.fill", tint: .secondary)
+                beat(String(localized: "Dictate inserted"), "open cloud code", icon: "text.cursor", tint: .secondary)
+                beat(String(localized: "You fixed it to"), "open Claude Code", icon: "pencil", tint: .orange)
 
                 Divider()
 
                 beat(
-                    "Next time you say it",
+                    String(localized: "Next time you say it"),
                     enabled ? "open Claude Code" : "open cloud code",
                     icon: enabled ? "checkmark.circle.fill" : "arrow.counterclockwise",
                     tint: enabled ? .green : .secondary
@@ -712,9 +712,9 @@ struct MenuBarIconDemo: View {
                         Text("Dictate runs invisibly. Everything still works:")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        shortcut("Your hotkey", "dictate")
-                        shortcut("⌃⌥⌘V", "recent dictations")
-                        shortcut("⌃⌥⌘,", "these settings")
+                        shortcut(String(localized: "Your hotkey"), String(localized: "dictate"))
+                        shortcut("⌃⌥⌘V", String(localized: "recent dictations"))
+                        shortcut("⌃⌥⌘,", String(localized: "these settings"))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

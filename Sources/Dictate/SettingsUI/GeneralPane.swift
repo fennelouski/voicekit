@@ -27,9 +27,9 @@ struct GeneralPane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "Hold to dictate, release to insert. A quick tap locks dictation on.",
-                    title: "Hotkey",
-                    explanation: """
+                    caption: String(localized: "Hold to dictate, release to insert. A quick tap locks dictation on."),
+                    title: String(localized: "Hotkey"),
+                    explanation: String(localized: """
                         Hold the key and speak; let go and your words are inserted wherever the \
                         cursor is. If you'd rather not hold it down, tap it once to lock dictation \
                         on and tap again to stop.
@@ -37,20 +37,20 @@ struct GeneralPane: View {
                         Fn sits under your left thumb and does nothing else in most apps, which is \
                         why it's the default. Pick Right ⌘ if you use Fn for something else — \
                         switching input sources, say, or the emoji picker.
-                        """,
+                        """),
                     value: $hotkeyRaw.asEnum(Hotkey.fn)
                 ) { HotkeyDemo(hotkey: $0) }
             } header: {
-                SettingsLabel("Hotkey", systemImage: "keyboard", tint: SettingsTint.hotkey)
+                SettingsLabel(String(localized: "Hotkey"), systemImage: "keyboard", tint: SettingsTint.hotkey)
             }
 
             Section {
                 Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
 
                 SettingCaptionRow(
-                    caption: "Hide it and Dictate runs invisibly — ⌃⌥⌘, always brings Settings back.",
-                    title: "Menu Bar Icon",
-                    explanation: """
+                    caption: String(localized: "Hide it and Dictate runs invisibly — ⌃⌥⌘, always brings Settings back."),
+                    title: String(localized: "Menu Bar Icon"),
+                    explanation: String(localized: """
                         The menu bar icon is the visible way to reach Settings, the Welcome Guide, \
                         and your recent dictations.
 
@@ -63,7 +63,7 @@ struct GeneralPane: View {
 
                         Those work system-wide whether the icon is showing or not, so you can't \
                         lock yourself out by turning it off.
-                        """,
+                        """),
                     value: $showMenuBarIcon
                 ) { MenuBarIconDemo(shown: $0) }
 
@@ -85,7 +85,7 @@ struct GeneralPane: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                SettingsLabel("System", systemImage: "gearshape", tint: SettingsTint.system)
+                SettingsLabel(String(localized: "System"), systemImage: "gearshape", tint: SettingsTint.system)
             }
         }
         .formStyle(.grouped)

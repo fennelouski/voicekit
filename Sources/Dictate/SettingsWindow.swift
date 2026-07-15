@@ -22,11 +22,11 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: return "General"
-        case .input: return "Input"
-        case .cleanup: return "Cleanup"
-        case .appearance: return "Appearance"
-        case .privacy: return "Privacy"
+        case .general: return String(localized: "General")
+        case .input: return String(localized: "Input")
+        case .cleanup: return String(localized: "Cleanup")
+        case .appearance: return String(localized: "Appearance")
+        case .privacy: return String(localized: "Privacy")
         }
     }
 
@@ -34,11 +34,11 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     /// making you click through all five.
     var subtitle: String {
         switch self {
-        case .general: return "Hotkey, menu bar, launch at login"
-        case .input: return "Language and microphone"
-        case .cleanup: return "Which model polishes your words"
-        case .appearance: return "The popup you see while dictating"
-        case .privacy: return "Learned corrections, transcripts"
+        case .general: return String(localized: "Hotkey, menu bar, launch at login")
+        case .input: return String(localized: "Language and microphone")
+        case .cleanup: return String(localized: "Which model polishes your words")
+        case .appearance: return String(localized: "The popup you see while dictating")
+        case .privacy: return String(localized: "Learned corrections, transcripts")
         }
     }
 
@@ -77,7 +77,7 @@ final class SettingsWindowController: NSWindowController {
         hosting.sizingOptions = []
 
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Dictate Settings"
+        window.title = String(localized: "Dictate Settings")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.contentMinSize = NSSize(width: 640, height: 460)
         window.setContentSize(NSSize(width: 780, height: 580))

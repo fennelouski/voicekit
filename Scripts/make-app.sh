@@ -15,6 +15,11 @@ cp .build/release/Dictate "$APP/Contents/MacOS/Dictate"
 cp Scripts/Info.plist "$APP/Contents/Info.plist"
 cp Scripts/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
+# Localizations: regenerate the .lproj bundles from Scripts/i18n/, then copy them
+# into the app's Resources so String(localized:)/SwiftUI resolve against the main bundle.
+python3 Scripts/localize.py
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
+
 # Prefer a stable signing identity: ad-hoc signatures change every build,
 # which makes macOS forget the mic/Accessibility permission grants.
 IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development|Developer ID Application/{print $2; exit}')

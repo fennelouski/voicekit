@@ -21,6 +21,9 @@ enum TermsOfService {
     // Canonical EULA. The website mirrors this verbatim at
     // https://nathanfennel.com/dictate/eula — keep the two in sync when editing, and bump
     // `version` on any material change. Not legal advice; have a lawyer review before relying on it.
+    // ponytail: the binding legal text stays in canonical English (the version the user agrees to,
+    // mirrored on the website); only the surrounding UI chrome is localized. Translate via counsel,
+    // not a string table, if a localized EULA is ever required.
     static let text = """
     TERMS OF SERVICE & END USER LICENSE AGREEMENT
 

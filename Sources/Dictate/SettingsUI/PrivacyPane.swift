@@ -24,16 +24,16 @@ struct PrivacyPane: View {
                 Toggle("Learn from my edits", isOn: $learningEnabled)
 
                 SettingCaptionRow(
-                    caption: "Dictate watches how you fix its text and stops making the same mistake.",
-                    title: "Learn From My Edits",
-                    explanation: """
+                    caption: String(localized: "Dictate watches how you fix its text and stops making the same mistake."),
+                    title: String(localized: "Learn From My Edits"),
+                    explanation: String(localized: """
                         After inserting text, Dictate watches (via Accessibility) how you edit it. \
                         If you keep correcting "cloud code" to "Claude Code", it learns that and \
                         applies the correction itself next time.
 
                         Everything stays on this Mac — the corrections are never uploaded, and they \
                         apply no matter which cleanup mode you're using. Reset them any time below.
-                        """,
+                        """),
                     value: $learningEnabled
                 ) { LearningDemo(enabled: $0) }
 
@@ -50,16 +50,16 @@ struct PrivacyPane: View {
                     }
                 }
             } header: {
-                SettingsLabel("Learning", systemImage: "brain", tint: SettingsTint.learning)
+                SettingsLabel(String(localized: "Learning"), systemImage: "brain", tint: SettingsTint.learning)
             }
 
             Section {
                 Toggle("Save conversation transcripts", isOn: $conversationTranscripts)
 
                 SettingCaptionRow(
-                    caption: "Write a speaker-labeled transcript to disk as you dictate.",
-                    title: "Conversation Transcripts",
-                    explanation: """
+                    caption: String(localized: "Write a speaker-labeled transcript to disk as you dictate."),
+                    title: String(localized: "Conversation Transcripts"),
+                    explanation: String(localized: """
                         Saves a transcript to this Mac while you dictate, written to disk moments \
                         after the words are spoken, with speakers told apart. It works best with \
                         two or three voices.
@@ -72,7 +72,7 @@ struct PrivacyPane: View {
                         No audio is ever stored, nothing is uploaded, and the speaker labels \
                         appear only in the file — they never show up in the text Dictate pastes \
                         for you. On by default; turn it off and nothing is written at all.
-                        """,
+                        """),
                     value: $conversationTranscripts
                 ) { TranscriptsDemo(enabled: $0) }
 
@@ -86,7 +86,7 @@ struct PrivacyPane: View {
                     }
                 }
             } header: {
-                SettingsLabel("Transcripts", systemImage: "doc.text", tint: SettingsTint.privacy)
+                SettingsLabel(String(localized: "Transcripts"), systemImage: "doc.text", tint: SettingsTint.privacy)
             }
         }
         .formStyle(.grouped)

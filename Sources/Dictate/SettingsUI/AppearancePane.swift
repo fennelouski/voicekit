@@ -56,9 +56,9 @@ struct AppearancePane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "The pill that floats over your screen while you dictate.",
-                    title: "Dictation Popup",
-                    explanation: """
+                    caption: String(localized: "The pill that floats over your screen while you dictate."),
+                    title: String(localized: "Dictation Popup"),
+                    explanation: String(localized: """
                         While you're dictating, a small pill floats over your screen showing what's \
                         been recognized so far and how loud you are. It never takes focus, so it \
                         can't steal your keystrokes.
@@ -67,7 +67,7 @@ struct AppearancePane: View {
                         quietest, the voice orb and sonar ripple are the liveliest, and the \
                         breathing halo drops the indicator entirely and lets the pill itself glow — \
                         which leaves the most room for the transcript.
-                        """,
+                        """),
                     value: $styleRaw.asEnum(HUDStyle.bars)
                 ) { HUDStyleDemo(style: $0) }
 
@@ -78,20 +78,20 @@ struct AppearancePane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "The pill grows to fit — bigger text means a taller pill.",
-                    title: "Text Size",
-                    explanation: """
+                    caption: String(localized: "The pill grows to fit — bigger text means a taller pill."),
+                    title: String(localized: "Text Size"),
+                    explanation: String(localized: """
                         How large the transcript is drawn inside the pill. The pill (and the \
                         invisible window behind it) grow to fit, so nothing gets clipped at the \
                         larger sizes.
 
                         The transcript is always trimmed to the last stretch of what you said, so \
                         a long dictation scrolls rather than sprawling across your screen.
-                        """,
+                        """),
                     value: $textSizeRaw.asEnum(HUDTextSize.medium)
                 ) { HUDTextSizeDemo(size: $0) }
             } header: {
-                SettingsLabel("Dictation Popup", systemImage: "waveform", tint: SettingsTint.appearance)
+                SettingsLabel(String(localized: "Dictation Popup"), systemImage: "waveform", tint: SettingsTint.appearance)
             }
 
             Section {
@@ -100,20 +100,20 @@ struct AppearancePane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "Anchored to a corner or edge, the pill grows inward toward the centre of the screen.",
-                    title: "Position",
-                    explanation: """
+                    caption: String(localized: "Anchored to a corner or edge, the pill grows inward toward the centre of the screen."),
+                    title: String(localized: "Position"),
+                    explanation: String(localized: """
                         Where the pill sits on screen. Bottom centre is the default, out of the way \
                         of most windows.
 
                         When the pill is anchored to a side, it hugs that edge and extends toward \
                         the middle of the screen as the transcript gets longer — rather than \
                         growing out in both directions and running off the edge.
-                        """,
+                        """),
                     value: $positionRaw.asEnum(HUDPosition.bottomCenter)
                 ) { HUDPositionDemo(position: $0) }
             } header: {
-                SettingsLabel("Placement", systemImage: "rectangle.inset.filled", tint: SettingsTint.appearance)
+                SettingsLabel(String(localized: "Placement"), systemImage: "rectangle.inset.filled", tint: SettingsTint.appearance)
             }
 
             Section {
@@ -124,16 +124,16 @@ struct AppearancePane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "How long the pill takes to change state — listening to cleaning up.",
-                    title: "Transitions",
-                    explanation: """
+                    caption: String(localized: "How long the pill takes to change state — listening to cleaning up."),
+                    title: String(localized: "Transitions"),
+                    explanation: String(localized: """
                         The pill crossfades when it changes state: from listening, to "Cleaning \
                         up…", to an error. Normal is a little over a quarter of a second, which \
                         reads as a transition rather than a flash.
 
                         Instant means genuinely no animation, not a very fast one — the pill simply \
                         swaps.
-                        """,
+                        """),
                     value: $transitionRaw.asEnum(HUDSpeed.normal)
                 ) { HUDTransitionDemo(speed: $0) }
 
@@ -144,20 +144,20 @@ struct AppearancePane: View {
                 }
 
                 SettingCaptionRow(
-                    caption: "How long new words take to land as you speak.",
-                    title: "Text Appears",
-                    explanation: """
+                    caption: String(localized: "How long new words take to land as you speak."),
+                    title: String(localized: "Text Appears"),
+                    explanation: String(localized: """
                         How quickly recognized words settle into the pill. This fires continuously \
                         while you talk, so it defaults faster than the state transitions.
 
                         ASAP puts words up the instant they're recognized. Slow-mo takes its sweet \
                         time about it. Neither affects how fast the text is actually inserted — \
                         this is purely how the popup reads.
-                        """,
+                        """),
                     value: $revealRaw.asEnum(HUDSpeed.fast)
                 ) { HUDRevealDemo(speed: $0) }
             } header: {
-                SettingsLabel("Motion", systemImage: "dial.medium", tint: SettingsTint.appearance)
+                SettingsLabel(String(localized: "Motion"), systemImage: "dial.medium", tint: SettingsTint.appearance)
             }
         }
         .formStyle(.grouped)

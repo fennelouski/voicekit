@@ -224,9 +224,9 @@ struct OnboardingView: View {
 
     private var primaryTitle: String {
         switch step {
-        case 0: return "Get Started"
-        case stepCount - 1: return "Start Dictating"
-        default: return "Continue"
+        case 0: return String(localized: "Get Started")
+        case stepCount - 1: return String(localized: "Start Dictating")
+        default: return String(localized: "Continue")
         }
     }
 }
@@ -251,14 +251,14 @@ private struct WelcomeStep: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 FeatureRow(symbol: "lock.shield.fill",
-                           title: "Completely private",
-                           detail: "Speech is transcribed on your Mac's Neural Engine. Audio and text never leave this machine.")
+                           title: String(localized: "Completely private"),
+                           detail: String(localized: "Speech is transcribed on your Mac's Neural Engine. Audio and text never leave this machine."))
                 FeatureRow(symbol: "bolt.fill",
-                           title: "Fast",
-                           detail: "Live on-device transcription with no network round-trip — it works on airplane mode.")
+                           title: String(localized: "Fast"),
+                           detail: String(localized: "Live on-device transcription with no network round-trip — it works on airplane mode."))
                 FeatureRow(symbol: "keyboard.fill",
-                           title: "Works everywhere",
-                           detail: "Mail, Slack, your editor — anywhere you can type, you can dictate.")
+                           title: String(localized: "Works everywhere"),
+                           detail: String(localized: "Mail, Slack, your editor — anywhere you can type, you can dictate."))
             }
             .padding(.top, 22)
         }
@@ -304,26 +304,26 @@ private struct PermissionsStep: View {
             VStack(spacing: 10) {
                 PermissionRow(
                     symbol: "mic.fill",
-                    title: "Microphone",
-                    detail: "To hear your voice",
+                    title: String(localized: "Microphone"),
+                    detail: String(localized: "To hear your voice"),
                     granted: model.mic == .granted,
-                    buttonTitle: model.mic == .denied ? "Open Settings" : "Grant",
+                    buttonTitle: model.mic == .denied ? String(localized: "Open Settings") : String(localized: "Grant"),
                     action: model.requestMic
                 )
                 PermissionRow(
                     symbol: "waveform.badge.mic",
-                    title: "Speech Recognition",
-                    detail: "To transcribe on-device",
+                    title: String(localized: "Speech Recognition"),
+                    detail: String(localized: "To transcribe on-device"),
                     granted: model.speech == .granted,
-                    buttonTitle: model.speech == .denied ? "Open Settings" : "Grant",
+                    buttonTitle: model.speech == .denied ? String(localized: "Open Settings") : String(localized: "Grant"),
                     action: model.requestSpeech
                 )
                 PermissionRow(
                     symbol: "accessibility",
-                    title: "Accessibility",
-                    detail: "For the global hotkey, and to type into other apps",
+                    title: String(localized: "Accessibility"),
+                    detail: String(localized: "For the global hotkey, and to type into other apps"),
                     granted: model.accessibility,
-                    buttonTitle: "Open Settings",
+                    buttonTitle: String(localized: "Open Settings"),
                     action: model.requestAccessibility
                 )
             }
@@ -441,19 +441,20 @@ private struct DoneStep: View {
 
             Text("You're all set")
                 .font(.system(size: 28, weight: .bold))
-            Text("Dictate lives in your menu bar — look for the \(Image(systemName: "mic")) icon.")
+            Label("Dictate lives in your menu bar — look for the microphone icon.", systemImage: "mic")
+                .labelStyle(.titleAndIcon)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 14) {
                 FeatureRow(symbol: "hand.tap.fill",
-                           title: "Quick tap to lock",
-                           detail: "Tap the hotkey to keep dictation running hands-free; tap again to stop and insert.")
+                           title: String(localized: "Quick tap to lock"),
+                           detail: String(localized: "Tap the hotkey to keep dictation running hands-free; tap again to stop and insert."))
                 FeatureRow(symbol: "sparkles",
-                           title: "AI cleanup",
-                           detail: "Turn on Apple Intelligence polish in Settings to remove false starts and fix punctuation — still fully on-device.")
+                           title: String(localized: "AI cleanup"),
+                           detail: String(localized: "Turn on Apple Intelligence polish in Settings to remove false starts and fix punctuation — still fully on-device."))
                 FeatureRow(symbol: "gearshape.fill",
-                           title: "Make it yours",
-                           detail: "Change the hotkey, language, or microphone anytime from the menu bar icon → Settings.")
+                           title: String(localized: "Make it yours"),
+                           detail: String(localized: "Change the hotkey, language, or microphone anytime from the menu bar icon → Settings."))
             }
             .padding(.top, 22)
         }
