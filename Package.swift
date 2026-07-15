@@ -19,6 +19,10 @@ let package = Package(
             targets: ["Dictate"]
         ),
     ],
+    dependencies: [
+        // Speaker diarization (on-device CoreML). Dictate-only; VoiceKit stays dependency-free.
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.9.0"),
+    ],
     targets: [
         .target(
             name: "VoiceKit",
@@ -28,7 +32,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "Dictate",
-            dependencies: ["VoiceKit"],
+            dependencies: [
+                "VoiceKit",
+                .product(name: "FluidAudio", package: "FluidAudio"),
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ]

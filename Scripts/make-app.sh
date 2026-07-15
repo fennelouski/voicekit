@@ -10,9 +10,10 @@ swift build -c release --product Dictate
 
 APP=build/Dictate.app
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Dictate "$APP/Contents/MacOS/Dictate"
 cp Scripts/Info.plist "$APP/Contents/Info.plist"
+cp Scripts/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Prefer a stable signing identity: ad-hoc signatures change every build,
 # which makes macOS forget the mic/Accessibility permission grants.

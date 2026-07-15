@@ -104,6 +104,16 @@ public actor SpeechRecognitionService: TranscriptionProvider {
             }
         }
 
+        // Speech authorization and microphone permission are separate grants. Without this
+        // check a denied mic sails past the gate above and fails deep in the audio engine as
+        // an opaque OSStatus; catch it here so the caller can say "grant the mic" plainly.
+        // iOS-only: a keyboard extension can't prompt, so the container app grants it first.
+        #if os(iOS) || os(visionOS)
+        if AVAudioApplication.shared.recordPermission != .granted {
+            throw RecognitionError.notAuthorized
+        }
+        #endif
+
         // Determine locale
         let recognitionLocale = locale ?? Locale.current
 
@@ -141,11 +151,14 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         analyzerFormat = optimalFormat
         bufferConverter = BufferConverter()
 
-        // Configure audio session for recording (iOS/visionOS only; macOS handles this via AVAudioEngine)
+        // Configure audio session for recording (iOS/visionOS only; macOS handles this via AVAudioEngine).
+        // `.record`, not `.playAndRecord`: dictation never plays audio, and a keyboard extension's
+        // sandbox will refuse to activate a playback-capable session — that refusal is what surfaced
+        // as "Couldn't start dictation". The minimal category is also the one that's granted.
         #if os(iOS) || os(visionOS)
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            try audioSession.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP])
             try audioSession.setActive(true)
         } catch {
             throw RecognitionError.engineStartFailed(error)
@@ -184,7 +197,11 @@ public actor SpeechRecognitionService: TranscriptionProvider {
                     let isFinal = result.isFinal
                     guard !text.isEmpty else { continue }
                     Self.logger.debug("segment: \"\(text, privacy: .private)\" isFinal: \(isFinal)")
-                    capturedTranscriptCont?.yield(TranscriptionResult(text: text, isFinal: isFinal))
+                    let range = result.range
+                    capturedTranscriptCont?.yield(TranscriptionResult(
+                        text: text, isFinal: isFinal,
+                        start: range.start.seconds.isFinite ? range.start.seconds : nil,
+                        end: range.end.seconds.isFinite ? range.end.seconds : nil))
                 }
             } catch {
                 Self.logger.error("results stream error: \(error)")
@@ -196,7 +213,10 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        guard recordingFormat.sampleRate > 0 else {
+        // installTap throws an uncatchable ObjC exception (SIGABRT) if the format is invalid —
+        // channelCount 0 (mic not ready / no input device) passes a sampleRate-only check, so
+        // guard both.
+        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
             throw RecognitionError.engineStartFailed(NSError(
                 domain: "SpeechRecognitionService",
                 code: -1,
@@ -210,6 +230,10 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         let converter = bufferConverter
         let targetFormat = analyzerFormat
 
+        // installTap throws "Only one tap can be installed" if one survived a prior session that
+        // didn't clean up (interrupted stop, error between install and removeTap). removeTap is a
+        // no-op when none exists, so this is a safe idempotent reset before installing ours.
+        inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { buffer, _ in
             // Feed converted audio to the analyzer
             if let targetFormat, let converter {

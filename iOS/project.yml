@@ -1,0 +1,94 @@
+name: DictateiOS
+options:
+  bundleIdPrefix: com.voicekit
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+packages:
+  VoiceKit:
+    path: ../
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: EJLR2RPSV2
+
+targets:
+  Dictate:
+    type: application
+    platform: iOS
+    sources: [App]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voicekit.Dictate
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - package: VoiceKit
+        product: VoiceKit
+      - target: DictateKeyboard
+        embed: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Dictate
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSMicrophoneUsageDescription: Dictate listens so the keyboard can turn your speech into text. Audio never leaves your device.
+        NSSpeechRecognitionUsageDescription: Speech is transcribed on-device to type what you say.
+
+  DictateKeyboard:
+    type: app-extension
+    platform: iOS
+    sources: [Keyboard]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voicekit.Dictate.keyboard
+    dependencies:
+      - package: VoiceKit
+        product: VoiceKit
+    info:
+      path: Keyboard/Info.plist
+      properties:
+        CFBundleDisplayName: Dictate
+        # Both plists carry the usage strings: the prompt is presented by the containing
+        # app, but the extension is the process that opens the mic.
+        NSMicrophoneUsageDescription: Dictate listens so the keyboard can turn your speech into text. Audio never leaves your device.
+        NSSpeechRecognitionUsageDescription: Speech is transcribed on-device to type what you say.
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            # Required: without Full Access the extension cannot open the microphone.
+            RequestsOpenAccess: true
+
+  DictateKeyboardTests:
+    type: bundle.unit-test
+    platform: iOS
+    # Compiles the pipeline source directly rather than linking the appex — an app
+    # extension isn't a testable host.
+    sources:
+      - Tests
+      - Keyboard/DictationPipeline.swift
+    dependencies:
+      - package: VoiceKit
+        product: VoiceKit
+
+schemes:
+  Dictate:
+    build:
+      targets:
+        Dictate: all
+        DictateKeyboardTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [DictateKeyboardTests]

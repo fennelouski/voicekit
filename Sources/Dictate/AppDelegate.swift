@@ -9,6 +9,7 @@
 #if os(macOS)
 import AppKit
 import AVFoundation
+import Carbon.HIToolbox
 import VoiceKit
 
 @available(macOS 26.0, *)
@@ -20,16 +21,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let historyPanel = HistoryPanelController()
     private var settingsController: SettingsWindowController?
     private var onboardingController: OnboardingWindowController?
+    private var termsController: TermsWindowController?
     private var toggleMenuItem: NSMenuItem?
     private var hintMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         updateStatusItemVisibility()
 
-        if Settings.onboardingComplete {
-            promptForPermissionsIfNeeded()
+        // Nothing else runs until the current Terms are accepted. Covers new installs and,
+        // via the version check, anyone who accepted an older revision.
+        if Settings.termsAccepted {
+            beginAfterTerms()
         } else {
-            showOnboarding()
+            showTerms()
         }
 
         // Global NSEvent monitors installed before Accessibility trust never fire;
@@ -50,7 +54,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor.hotkey = Settings.hotkey
         hotkeyMonitor.start()
 
-        HistoryHotkey.register { [weak self] in self?.historyPanel.toggle() }
+        GlobalHotkey.register(keyCode: kVK_ANSI_V, id: GlobalHotkey.history) { [weak self] in
+            self?.historyPanel.toggle()
+        }
+        // The way back in when the menu bar icon is hidden. Registered whether it's hidden or
+        // not, so the shortcut is already in muscle memory by the time someone turns it off.
+        GlobalHotkey.register(keyCode: kVK_ANSI_Comma, id: GlobalHotkey.settings) { [weak self] in
+            self?.showSettings()
+        }
 
         NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
@@ -62,6 +73,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.updateStatusItemVisibility()
             }
         }
+    }
+
+    /// The onboarding/permission flow, gated behind Terms acceptance.
+    private func beginAfterTerms() {
+        if Settings.onboardingComplete {
+            promptForPermissionsIfNeeded()
+        } else {
+            showOnboarding()
+        }
+    }
+
+    private func showTerms() {
+        termsController = TermsWindowController(readOnly: false) { [weak self] in
+            self?.termsController = nil
+            self?.beginAfterTerms()
+        }
+        termsController?.show()
+    }
+
+    @objc private func showTermsReadOnly() {
+        // If the acceptance gate is still up, don't replace it — just surface it.
+        guard Settings.termsAccepted else {
+            termsController?.show()
+            return
+        }
+        termsController = TermsWindowController(readOnly: true) {}
+        termsController?.show()
     }
 
     /// The icon is optional: hotkeys keep working without it, and reopening
@@ -104,11 +142,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(historyItem)
         menu.addItem(.separator())
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        // Advertise the global shortcut, not ⌘, — that's the one that still works once the
+        // icon (and this menu) are gone.
+        settingsItem.keyEquivalentModifierMask = [.control, .option, .command]
         settingsItem.target = self
         menu.addItem(settingsItem)
         let welcomeItem = NSMenuItem(title: "Welcome Guide…", action: #selector(showWelcomeGuide), keyEquivalent: "")
         welcomeItem.target = self
         menu.addItem(welcomeItem)
+        let termsItem = NSMenuItem(title: "Terms of Service…", action: #selector(showTermsReadOnly), keyEquivalent: "")
+        termsItem.target = self
+        menu.addItem(termsItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Dictate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -154,7 +198,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showSettings() {
         if settingsController == nil {
-            settingsController = SettingsWindowController()
+            settingsController = SettingsWindowController { [weak self] in
+                self?.settingsController?.close()
+                self?.showOnboarding()
+            }
         }
         settingsController?.show()
     }

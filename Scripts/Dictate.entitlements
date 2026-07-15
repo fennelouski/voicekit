@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Hardened runtime gates the microphone behind this; without it, recording is
+	     denied even after the user grants mic access. Speech is on-device (no extra
+	     entitlement); Accessibility / synthetic ⌘V are TCC grants, not entitlements.
+	     Not sandboxed on purpose: sandbox forbids controlling other apps. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

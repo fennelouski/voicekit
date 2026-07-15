@@ -2,28 +2,96 @@
 //  SettingsWindow.swift
 //  Dictate
 //
-//  Settings: hotkey, language, microphone, AI cleanup, launch at login.
+//  The settings window: a sidebar of panes, each one a Form. The panes themselves
+//  live in SettingsUI/.
 //
 
 #if os(macOS)
 import AppKit
-import ServiceManagement
-import Speech
 import SwiftUI
-import VoiceKit
+
+@available(macOS 26.0, *)
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general
+    case input
+    case cleanup
+    case appearance
+    case privacy
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .input: return "Input"
+        case .cleanup: return "Cleanup"
+        case .appearance: return "Appearance"
+        case .privacy: return "Privacy"
+        }
+    }
+
+    /// What's actually inside, so the sidebar answers "which pane was that in?" without
+    /// making you click through all five.
+    var subtitle: String {
+        switch self {
+        case .general: return "Hotkey, menu bar, launch at login"
+        case .input: return "Language and microphone"
+        case .cleanup: return "Which model polishes your words"
+        case .appearance: return "The popup you see while dictating"
+        case .privacy: return "Learned corrections, transcripts"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general: return "gearshape"
+        case .input: return "mic"
+        case .cleanup: return "wand.and.sparkles"
+        case .appearance: return "paintbrush"
+        case .privacy: return "hand.raised"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .general: return SettingsTint.system
+        case .input: return SettingsTint.input
+        case .cleanup: return SettingsTint.cleanup
+        case .appearance: return SettingsTint.appearance
+        case .privacy: return SettingsTint.privacy
+        }
+    }
+}
 
 @available(macOS 26.0, *)
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    convenience init() {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
+    private static let autosaveName = "DictateSettings"
+
+    /// `onWelcome` closes this window and opens the guide — AppDelegate owns both, so it
+    /// hands the action down rather than the view reaching back up for it.
+    convenience init(onWelcome: @escaping () -> Void) {
+        let hosting = NSHostingController(rootView: SettingsView(onWelcome: onWelcome))
+        // The default, .preferredContentSize, makes the window track SwiftUI's intrinsic size —
+        // which fights a resizable split view and pins the window to whichever pane is showing.
+        hosting.sizingOptions = []
+
+        let window = NSWindow(contentViewController: hosting)
         window.title = "Dictate Settings"
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.contentMinSize = NSSize(width: 640, height: 460)
+        window.setContentSize(NSSize(width: 780, height: 580))
+
         self.init(window: window)
+
+        // Restore before naming, or the name-setting call saves the frame we're about to replace.
+        if !window.setFrameUsingName(Self.autosaveName) {
+            window.center()
+        }
+        window.setFrameAutosaveName(Self.autosaveName)
     }
 
     func show() {
-        window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -31,206 +99,124 @@ final class SettingsWindowController: NSWindowController {
 
 @available(macOS 26.0, *)
 struct SettingsView: View {
-    @AppStorage(Settings.hotkeyKey) private var hotkeyRaw = Hotkey.fn.rawValue
-    @AppStorage(Settings.localeKey) private var localeId = ""
-    @AppStorage(Settings.cleanupModeKey) private var cleanupModeRaw = Settings.cleanupMode.rawValue
-    @AppStorage(Settings.claudeModelKey) private var claudeModelRaw = Settings.claudeModel
-    @AppStorage(Settings.cleanupInstructionsKey) private var cleanupInstructions = ""
-    @AppStorage(Settings.localModelBaseURLKey) private var localBaseURL = "http://localhost:11434/v1"
-    @AppStorage(Settings.localModelNameKey) private var localModelName = ""
-    @AppStorage(Settings.learningEnabledKey) private var learningEnabled = true
-    @AppStorage(Settings.showMenuBarIconKey) private var showMenuBarIcon = true
+    var onWelcome: () -> Void = {}
 
-    @State private var apiKey = Settings.claudeAPIKey ?? ""
-    @State private var keyTest = KeyTestState.idle
+    @AppStorage(Settings.settingsPaneKey) private var paneRaw = SettingsPane.general.rawValue
 
-    private enum KeyTestState {
-        case idle
-        case testing
-        case success
-        case failure(String)
-    }
-
-    @State private var locales: [Locale] = []
-    @State private var devices: [SelectableDevice] = []
-    @State private var selectedDeviceId = AudioInputSelection.loadSelectedDeviceId() ?? ""
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var correctionsCleared = false
+    private var pane: SettingsPane { SettingsPane(rawValue: paneRaw) ?? .general }
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Hotkey", selection: $hotkeyRaw) {
-                    ForEach(Hotkey.allCases) { hotkey in
-                        Text("Hold \(hotkey.displayName)").tag(hotkey.rawValue)
+        NavigationSplitView {
+            // Cards rather than list rows: five bare rows left most of the sidebar empty,
+            // and the room was better spent saying what's in each pane.
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(SettingsPane.allCases) { pane in
+                        card(pane)
                     }
-                }
-                Text("Hold to dictate, release to insert. A quick tap locks dictation on; tap again to stop.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
 
-            Section {
-                Picker("Language", selection: $localeId) {
-                    Text("System default").tag("")
-                    ForEach(locales, id: \.identifier) { locale in
-                        Text(locale.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
-                            .tag(locale.identifier)
-                    }
-                }
-                Picker("Microphone", selection: $selectedDeviceId) {
-                    Text("System default").tag("")
-                    ForEach(devices) { device in
-                        Text(device.name).tag(device.id)
-                    }
-                }
-                .onChange(of: selectedDeviceId) { _, newValue in
-                    let device = devices.first { $0.id == newValue }
-                    AudioInputSelection.saveSelection(device: device, input: nil)
-                }
-            }
+                    Divider()
+                        .padding(.vertical, 4)
 
-            Section {
-                Picker("Cleanup", selection: $cleanupModeRaw) {
-                    ForEach(CleanupMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode.rawValue)
-                    }
+                    welcomeCard
                 }
-                switch CleanupMode(rawValue: cleanupModeRaw) ?? .off {
-                case .off:
-                    Text("Filler words (\"um\", \"uh\") are always removed. Cleanup additionally polishes punctuation and false starts.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                case .onDevice:
-                    Text(AICleanup.isAvailable
-                         ? "Polishes punctuation and removes false starts before inserting. Runs entirely on-device."
-                         : "Apple Intelligence isn't available on this Mac.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                case .claude:
-                    SecureField("Anthropic API key", text: $apiKey)
-                        .onChange(of: apiKey) { _, newValue in
-                            KeychainStore.set(newValue, forKey: Settings.claudeAPIKeyAccount)
-                            keyTest = .idle
-                        }
-                    Picker("Model", selection: $claudeModelRaw) {
-                        ForEach(ClaudeModel.allCases) { model in
-                            Text(model.displayName).tag(model.rawValue)
-                        }
-                    }
-                    TextField("Custom instructions (optional)", text: $cleanupInstructions, axis: .vertical)
-                        .lineLimit(2...4)
-                    testRow("Test key", disabled: apiKey.isEmpty)
-                    Text("Transcripts are sent to Anthropic to be cleaned; if the request fails, the local transcript is inserted unchanged. Audio and transcription stay on this Mac. A typical dictation costs well under a cent.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                case .local:
-                    TextField("Server URL", text: $localBaseURL, prompt: Text("http://localhost:11434/v1"))
-                        .onChange(of: localBaseURL) { _, _ in keyTest = .idle }
-                    TextField("Model name", text: $localModelName, prompt: Text("llama3.2"))
-                        .onChange(of: localModelName) { _, _ in keyTest = .idle }
-                    TextField("Custom instructions (optional)", text: $cleanupInstructions, axis: .vertical)
-                        .lineLimit(2...4)
-                    testRow("Test connection", disabled: localModelName.trimmingCharacters(in: .whitespaces).isEmpty)
-                    Text("Works with any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, MLX, vLLM. Everything stays on your machine; if the request fails, the transcript is inserted unchanged.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .padding(10)
             }
-
-            Section {
-                Toggle("Learn from my edits", isOn: $learningEnabled)
-                Text("After inserting, Dictate watches how you edit the text (via Accessibility) and learns corrections it applies next time. Everything stays on this Mac.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if learningEnabled {
-                    HStack {
-                        Button("Reset learned corrections") {
-                            CorrectionStore.shared.reset()
-                            correctionsCleared = true
-                        }
-                        if correctionsCleared {
-                            Label("Cleared", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                    }
-                }
-            }
-
-            Section {
-                Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
-                if !showMenuBarIcon {
-                    Text("Hotkeys keep working without the icon. To get back to Settings, open Dictate again from Finder or Spotlight.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, enabled in
-                        do {
-                            if enabled {
-                                try SMAppService.mainApp.register()
-                            } else {
-                                try SMAppService.mainApp.unregister()
-                            }
-                        } catch {
-                            launchAtLogin = SMAppService.mainApp.status == .enabled
-                        }
-                    }
-            }
-        }
-        .formStyle(.grouped)
-        .frame(width: 400)
-        .fixedSize(horizontal: false, vertical: true)
-        .task {
-            locales = await SpeechTranscriber.supportedLocales
-                .sorted { $0.identifier < $1.identifier }
-            devices = await AudioInputSelection.availableDevices()
+            .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
+        } detail: {
+            detail
+                .navigationTitle(pane.title)
         }
     }
 
-    private var isTestingKey: Bool {
-        if case .testing = keyTest { return true }
-        return false
+    /// An action, not a pane — it's below a divider and never draws as selected, because it
+    /// takes you out of Settings entirely.
+    private var welcomeCard: some View {
+        Button(action: onWelcome) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundStyle(SettingsTint.learning)
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Welcome Guide")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Permissions, your hotkey, and a box to try it in")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Welcome Guide. Closes settings and opens the guide.")
+    }
+
+    private func card(_ target: SettingsPane) -> some View {
+        let selected = target == pane
+        return Button {
+            paneRaw = target.rawValue
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: target.systemImage)
+                    .font(.system(size: 14))
+                    // Selected, the card is already the accent colour — a tinted glyph on top
+                    // of it would be unreadable.
+                    .foregroundStyle(selected ? Color.white : target.tint)
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(target.title)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(target.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(selected ? Color.accentColor : Color.primary.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(selected ? 0 : 0.10), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(target.title). \(target.subtitle)")
     }
 
     @ViewBuilder
-    private func testRow(_ title: String, disabled: Bool) -> some View {
-        HStack {
-            Button(title) { runCleanupTest() }
-                .disabled(disabled || isTestingKey)
-            switch keyTest {
-            case .idle:
-                EmptyView()
-            case .testing:
-                ProgressView()
-                    .controlSize(.small)
-            case .success:
-                Label("It works", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            case .failure(let message):
-                Label(message, systemImage: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
-            }
-        }
-    }
-
-    private func runCleanupTest() {
-        keyTest = .testing
-        Task {
-            do {
-                switch CleanupMode(rawValue: cleanupModeRaw) ?? .off {
-                case .claude:
-                    _ = try await ClaudeCleanup.clean("Um, so this is, uh, a test.")
-                case .local:
-                    _ = try await LocalModelCleanup.clean("Um, so this is, uh, a test.")
-                case .off, .onDevice:
-                    break
-                }
-                keyTest = .success
-            } catch {
-                keyTest = .failure(error.localizedDescription)
-            }
+    private var detail: some View {
+        switch pane {
+        case .general: GeneralPane()
+        case .input: InputPane()
+        case .cleanup: CleanupPane()
+        case .appearance: AppearancePane()
+        case .privacy: PrivacyPane()
         }
     }
 }

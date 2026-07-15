@@ -50,13 +50,13 @@ enum ClaudeCleanup {
 
     /// Clean `text` using the key, model, and instructions from Settings.
     static func clean(_ text: String, hints: [Correction] = []) async throws -> String {
-        guard let apiKey = Settings.claudeAPIKey, !apiKey.isEmpty else {
+        guard let apiKey = Settings.apiKey(for: .claude), !apiKey.isEmpty else {
             throw ClaudeCleanupError.missingKey
         }
         let request = makeRequest(
             text: text,
             apiKey: apiKey,
-            model: Settings.claudeModel,
+            model: Settings.model(for: .claude),
             customInstructions: Settings.cleanupInstructions,
             hints: hints
         )

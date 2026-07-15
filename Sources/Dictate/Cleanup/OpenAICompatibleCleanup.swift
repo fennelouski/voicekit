@@ -1,59 +1,71 @@
 //
-//  LocalModelCleanup.swift
+//  OpenAICompatibleCleanup.swift
 //  Dictate
 //
-//  Bring-your-own-model cleanup via any OpenAI-compatible chat-completions
-//  server (Ollama, LM Studio, llama.cpp, MLX, vLLM). Any failure throws;
-//  the caller inserts the locally cleaned transcript instead.
+//  One client for every provider that speaks OpenAI chat-completions: OpenAI, Gemini (via
+//  its compatibility layer), Groq, OpenRouter, and any local server (Ollama, LM Studio,
+//  llama.cpp, MLX, vLLM). Any failure throws; the caller inserts the locally cleaned
+//  transcript instead.
 //
 
 #if os(macOS)
 import Foundation
 import VoiceKit
 
-enum LocalModelCleanupError: LocalizedError {
+enum OpenAICompatibleError: LocalizedError {
     case missingConfig
+    case missingKey
     case http(Int, String?)
     case emptyResponse
 
     var errorDescription: String? {
         switch self {
         case .missingConfig: return "Set the server URL and model name in Settings"
+        case .missingKey: return "No API key — add one in Settings"
         case .http(let code, let message): return "HTTP \(code): \(message ?? "request failed")"
-        case .emptyResponse: return "Empty response from the local model"
+        case .emptyResponse: return "Empty response from the model"
         }
     }
 }
 
-enum LocalModelCleanup {
-    /// Clean `text` using the server URL and model from Settings.
-    static func clean(_ text: String, hints: [Correction] = []) async throws -> String {
+enum OpenAICompatibleCleanup {
+    /// Clean `text` with `provider`, using the key, model, and instructions from Settings.
+    static func clean(_ text: String, provider: AIProvider, hints: [Correction] = []) async throws -> String {
+        let apiKey = Settings.apiKey(for: provider) ?? ""
+        if provider.requiresKey, apiKey.isEmpty {
+            throw OpenAICompatibleError.missingKey
+        }
         guard let request = makeRequest(
             text: text,
-            baseURL: Settings.localModelBaseURL,
-            model: Settings.localModelName,
+            baseURL: Settings.baseURL(for: provider),
+            model: Settings.model(for: provider),
             customInstructions: Settings.cleanupInstructions,
+            apiKey: apiKey,
             hints: hints
         ) else {
-            throw LocalModelCleanupError.missingConfig
+            throw OpenAICompatibleError.missingConfig
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw LocalModelCleanupError.http(http.statusCode, apiErrorMessage(from: data))
+            throw OpenAICompatibleError.http(http.statusCode, apiErrorMessage(from: data))
         }
         return try parseResponse(data)
     }
 
     // MARK: - Pure request/response pieces (unit-tested)
 
-    /// "http://localhost:11434" and "http://localhost:11434/v1" both resolve
-    /// to ".../v1/chat/completions".
+    /// Ollama is habitually given as a bare host ("http://localhost:11434") and needs the
+    /// `/v1` it omits. Anything that already carries a path — `/v1`, Groq's `/openai/v1`,
+    /// Gemini's `/v1beta/openai` — is left exactly as the provider specified it.
     static func endpointURL(baseURL: String) -> URL? {
         var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         while base.hasSuffix("/") { base.removeLast() }
-        guard !base.isEmpty else { return nil }
-        if !base.hasSuffix("/v1") { base += "/v1" }
-        return URL(string: base + "/chat/completions")
+        guard !base.isEmpty, var components = URLComponents(string: base) else { return nil }
+        if components.path.isEmpty || components.path == "/" {
+            components.path = "/v1"
+        }
+        components.path += "/chat/completions"
+        return components.url
     }
 
     struct RequestBody: Encodable {
@@ -67,7 +79,14 @@ enum LocalModelCleanup {
         let stream: Bool
     }
 
-    static func makeRequest(text: String, baseURL: String, model: String, customInstructions: String, hints: [Correction] = []) -> URLRequest? {
+    static func makeRequest(
+        text: String,
+        baseURL: String,
+        model: String,
+        customInstructions: String,
+        apiKey: String = "",
+        hints: [Correction] = []
+    ) -> URLRequest? {
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !model.isEmpty, let url = endpointURL(baseURL: baseURL) else { return nil }
 
@@ -85,6 +104,11 @@ enum LocalModelCleanup {
         // ponytail: 30s — local models can be slow to cold-load; fallback covers the rest
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Local servers usually want no auth at all, and sending an empty bearer token
+        // makes some of them 401 rather than ignore it.
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = try? JSONEncoder().encode(body)
         return request
     }
@@ -111,7 +135,7 @@ enum LocalModelCleanup {
         )
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            throw LocalModelCleanupError.emptyResponse
+            throw OpenAICompatibleError.emptyResponse
         }
         return text
     }

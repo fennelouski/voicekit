@@ -1,5 +1,5 @@
 //
-//  LocalModelCleanupTests.swift
+//  OpenAICompatibleCleanupTests.swift
 //  DictateTests
 //
 //  Tests for the OpenAI-compatible request builder and response parser.
@@ -10,20 +10,20 @@ import Foundation
 import Testing
 @testable import Dictate
 
-struct LocalModelCleanupTests {
+struct OpenAICompatibleCleanupTests {
 
     @Test func endpointURLNormalization() {
-        #expect(LocalModelCleanup.endpointURL(baseURL: "http://localhost:11434")?.absoluteString
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: "http://localhost:11434")?.absoluteString
                 == "http://localhost:11434/v1/chat/completions")
-        #expect(LocalModelCleanup.endpointURL(baseURL: "http://localhost:11434/v1")?.absoluteString
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: "http://localhost:11434/v1")?.absoluteString
                 == "http://localhost:11434/v1/chat/completions")
-        #expect(LocalModelCleanup.endpointURL(baseURL: "http://localhost:1234/v1/")?.absoluteString
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: "http://localhost:1234/v1/")?.absoluteString
                 == "http://localhost:1234/v1/chat/completions")
-        #expect(LocalModelCleanup.endpointURL(baseURL: "   ") == nil)
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: "   ") == nil)
     }
 
     @Test func requestShape() throws {
-        let request = try #require(LocalModelCleanup.makeRequest(
+        let request = try #require(OpenAICompatibleCleanup.makeRequest(
             text: "hello world",
             baseURL: "http://localhost:11434",
             model: "llama3.2",
@@ -47,7 +47,7 @@ struct LocalModelCleanupTests {
     }
 
     @Test func emptyModelNameReturnsNil() {
-        #expect(LocalModelCleanup.makeRequest(
+        #expect(OpenAICompatibleCleanup.makeRequest(
             text: "hi", baseURL: "http://localhost:11434", model: "  ", customInstructions: ""
         ) == nil)
     }
@@ -56,28 +56,28 @@ struct LocalModelCleanupTests {
         let json = """
         {"choices":[{"index":0,"message":{"role":"assistant","content":"Hello world."},"finish_reason":"stop"}]}
         """
-        #expect(try LocalModelCleanup.parseResponse(Data(json.utf8)) == "Hello world.")
+        #expect(try OpenAICompatibleCleanup.parseResponse(Data(json.utf8)) == "Hello world.")
     }
 
     @Test func stripsInlineThinking() throws {
         let json = """
         {"choices":[{"message":{"content":"<think>the user wants...\\nokay</think>\\nHello world."}}]}
         """
-        #expect(try LocalModelCleanup.parseResponse(Data(json.utf8)) == "Hello world.")
+        #expect(try OpenAICompatibleCleanup.parseResponse(Data(json.utf8)) == "Hello world.")
     }
 
     @Test func emptyChoicesThrows() {
         let json = """
         {"choices":[]}
         """
-        #expect(throws: LocalModelCleanupError.self) {
-            try LocalModelCleanup.parseResponse(Data(json.utf8))
+        #expect(throws: OpenAICompatibleError.self) {
+            try OpenAICompatibleCleanup.parseResponse(Data(json.utf8))
         }
     }
 
     @Test func malformedJSONThrows() {
         #expect(throws: Error.self) {
-            try LocalModelCleanup.parseResponse(Data("not json".utf8))
+            try OpenAICompatibleCleanup.parseResponse(Data("not json".utf8))
         }
     }
 }

@@ -159,7 +159,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @StateObject private var permissions = PermissionModel()
 
-    private let stepCount = 5
+    private let stepCount = 4
 
     var body: some View {
         VStack(spacing: 0) {
@@ -168,7 +168,6 @@ struct OnboardingView: View {
                 case 0: WelcomeStep()
                 case 1: PermissionsStep(model: permissions)
                 case 2: FnKeyStep(model: permissions)
-                case 3: TryItStep()
                 default: DoneStep()
                 }
             }
@@ -429,54 +428,6 @@ private struct FnKeyStep: View {
             Label("Fn currently opens the emoji picker", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
         }
-    }
-}
-
-@available(macOS 26.0, *)
-private struct TryItStep: View {
-    @State private var text = ""
-    @FocusState private var focused: Bool
-
-    private var succeeded: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "mic.badge.plus")
-                .font(.system(size: 44, weight: .medium))
-                .foregroundStyle(.tint)
-
-            Text("Try it now")
-                .font(.system(size: 26, weight: .bold))
-            Text("Click the box below, then **hold Fn**, say something,\nand let go. (A quick tap locks dictation on — tap again to stop.)")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-
-            TextEditor(text: $text)
-                .focused($focused)
-                .font(.title3)
-                .scrollContentBackground(.hidden)
-                .padding(12)
-                .frame(height: 110)
-                .background(RoundedRectangle(cornerRadius: 12).fill(.quinary))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(succeeded ? Color.green.opacity(0.6) : Color.accentColor.opacity(0.4), lineWidth: 1.5)
-                )
-                .padding(.top, 10)
-
-            if succeeded {
-                Label("It works! Those words never left your Mac.", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-                    .transition(.scale.combined(with: .opacity))
-            } else {
-                Label("Waiting for your voice…", systemImage: "ellipsis")
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .animation(.snappy, value: succeeded)
-        .onAppear { focused = true }
     }
 }
 

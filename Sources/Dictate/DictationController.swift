@@ -8,11 +8,15 @@
 
 #if os(macOS)
 import AppKit
+import AVFoundation
+import os
 import VoiceKit
 
 @available(macOS 26.0, *)
 @MainActor
 final class DictationController {
+    private static let log = Logger(subsystem: "Dictate", category: "DictationController")
+
     var onListeningChange: ((Bool) -> Void)?
 
     private let service = SpeechRecognitionService()
@@ -21,6 +25,9 @@ final class DictationController {
     private let correctionObserver = CorrectionObserver()
     private var transcriptTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
+
+    private var recorder: ConversationRecorder?
+    private var audioTask: Task<Void, Never>?
 
     private var isStarting = false
     private var isListening = false
@@ -90,10 +97,24 @@ final class DictationController {
                 let deviceID = AudioInputSelection.loadSelectedDeviceId().flatMap { UInt32($0) }
                 let session = try await service.startRecognition(locale: Settings.locale, inputDeviceID: deviceID)
 
-                transcriptTask = Task {
+                if Settings.conversationTranscripts {
+                    let rec = ConversationRecorder()
+                    recorder = rec
+                    audioTask = Task { await rec.run(buffers: session.audioBuffers) }
+                    // Resolved off the hot path — the transcript can wait, the audio can't.
+                    Task {
+                        await rec.setMicrophone(await Self.microphoneDescription())
+                    }
+                }
+
+                transcriptTask = Task { [weak self] in
                     for await result in session.transcript {
-                        accumulator.add(result)
-                        hud.update(text: accumulator.preview)
+                        guard let self else { return }
+                        self.accumulator.add(result)
+                        self.hud.update(text: self.accumulator.preview)
+                        if result.isFinal, let rec = self.recorder {
+                            await rec.addSegment(text: result.text, start: result.start, end: result.end)
+                        }
                     }
                 }
                 levelTask = Task {
@@ -111,6 +132,7 @@ final class DictationController {
             } catch {
                 isStarting = false
                 onListeningChange?(false)
+                Self.log.error("start failed: \(error, privacy: .public)")
                 hud.showError(Self.message(for: error))
             }
         }
@@ -129,6 +151,17 @@ final class DictationController {
             await service.stopRecognition()
             await transcriptTask?.value
             levelTask?.cancel()
+            // Settle the transcript file in the background. Diarization (which may be
+            // downloading models on first run) must never delay — or deadlock — the paste.
+            if let rec = recorder {
+                let drain = audioTask
+                Task {
+                    await drain?.value
+                    await rec.finish()
+                }
+            }
+            recorder = nil
+            audioTask = nil
 
             let raw = accumulator.committed.isEmpty ? accumulator.preview : accumulator.committed
             var text = TranscriptCleaner.clean(raw)
@@ -137,34 +170,24 @@ final class DictationController {
             }
             let hints = Settings.learningEnabled ? CorrectionStore.shared.promptHints(limit: 20) : []
             var cleanupFallback = false
-            if !text.isEmpty {
-                switch Settings.cleanupMode {
-                case .off:
-                    break
-                case .onDevice:
-                    text = await AICleanup.clean(text, hints: hints)
-                case .claude:
-                    do {
-                        text = try await ClaudeCleanup.clean(text, hints: hints)
-                    } catch {
-                        // The invariant: never lose the transcript. Insert the
-                        // locally cleaned text and say why.
-                        cleanupFallback = true
-                    }
-                case .local:
-                    do {
-                        text = try await LocalModelCleanup.clean(text, hints: hints)
-                    } catch {
-                        cleanupFallback = true
-                    }
-                }
+            let chain = Settings.cleanupChain
+            if !text.isEmpty, !chain.isEmpty {
+                // Each step is tried in turn; a missing key just means that step isn't the one
+                // that cleans your text. Only a chain where nothing worked is worth mentioning.
+                let result = await CleanupChain.run(text, chain: chain, hints: hints, runStep: CleanupChain.liveStep)
+                text = result.text
+                cleanupFallback = result.allFailed
             }
             if !text.isEmpty {
                 // Trailing space so back-to-back dictations don't run together.
                 if let last = text.last, !last.isWhitespace { text += " " }
+                let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
+                Self.log.notice("inserting \(text.count, privacy: .public) chars into \(frontApp, privacy: .public)")
                 TextInserter.insert(text)
                 DictationHistory.shared.add(text)
                 correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
+            } else {
+                Self.log.notice("nothing to insert (empty transcript; raw was \(raw.count, privacy: .public) chars)")
             }
 
             if cleanupFallback {
@@ -177,6 +200,20 @@ final class DictationController {
             locked = false
             onListeningChange?(false)
         }
+    }
+
+    /// Name the hardware, not the setting: "System default" tells you nothing six months
+    /// later when you're trying to work out why one transcript sounds worse than another.
+    private static func microphoneDescription() async -> String {
+        let devices = await AudioInputSelection.availableDevices()
+        if let selected = AudioInputSelection.loadSelectedDeviceId(), !selected.isEmpty {
+            if let device = devices.first(where: { $0.id == selected }) {
+                return device.name
+            }
+            return "Selected device unavailable (id \(selected))"
+        }
+        let name = AVCaptureDevice.default(for: .audio)?.localizedName ?? "unknown"
+        return "\(name) (system default)"
     }
 
     private static func message(for error: Error) -> String {

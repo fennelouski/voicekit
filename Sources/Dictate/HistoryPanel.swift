@@ -51,37 +51,6 @@ final class DictationHistory {
     }
 }
 
-/// Global hotkey via Carbon RegisterEventHotKey: the app consumes the
-/// keypress (it never reaches the focused app) and no Accessibility
-/// permission is needed, unlike NSEvent global monitors.
-@MainActor
-enum HistoryHotkey {
-    private static var hotKeyRef: EventHotKeyRef?
-    private static var onPress: (() -> Void)?
-
-    /// Register ⌃⌥⌘V. Call once at launch.
-    static func register(_ handler: @escaping () -> Void) {
-        onPress = handler
-        var eventType = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            MainActor.assumeIsolated { HistoryHotkey.onPress?() }
-            return noErr
-        }, 1, &eventType, nil, nil)
-        let hotKeyID = EventHotKeyID(signature: OSType(0x4449_4354), id: 1) // 'DICT'
-        RegisterEventHotKey(
-            UInt32(kVK_ANSI_V),
-            UInt32(controlKey | optionKey | cmdKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-    }
-}
-
 @MainActor
 final class HistoryPanelController: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
