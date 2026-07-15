@@ -163,43 +163,76 @@ final class DictationController {
             recorder = nil
             audioTask = nil
 
+            // Snapshot everything cleanup needs while the accumulator still holds this session.
             let raw = accumulator.committed.isEmpty ? accumulator.preview : accumulator.committed
-            var text = TranscriptCleaner.clean(raw)
-            if Settings.learningEnabled {
-                text = CorrectionStore.shared.apply(to: text)
-            }
             let hints = Settings.learningEnabled ? CorrectionStore.shared.promptHints(limit: 20) : []
-            var cleanupFallback = false
             let chain = Settings.cleanupChain
-            if !text.isEmpty, !chain.isEmpty {
-                // Each step is tried in turn; a missing key just means that step isn't the one
-                // that cleans your text. Only a chain where nothing worked is worth mentioning.
-                let result = await CleanupChain.run(text, chain: chain, hints: hints, runStep: CleanupChain.liveStep)
-                text = result.text
-                cleanupFallback = result.allFailed
-            }
-            if !text.isEmpty {
-                // Trailing space so back-to-back dictations don't run together.
-                if let last = text.last, !last.isWhitespace { text += " " }
-                let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
-                Self.log.notice("inserting \(text.count, privacy: .public) chars into \(frontApp, privacy: .public)")
-                TextInserter.insert(text)
-                DictationHistory.shared.add(text)
-                correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
-            } else {
-                Self.log.notice("nothing to insert (empty transcript; raw was \(raw.count, privacy: .public) chars)")
-            }
 
-            if cleanupFallback {
-                hud.showError("Cleanup failed — inserted as-is")
-            } else {
-                hud.hide()
-            }
+            // Recording is fully torn down here — release the hotkey now so the next dictation
+            // can start immediately, without waiting for cleanup (which may hit the network for
+            // several seconds). Cleanup + insert is handed to a serial queue below.
             isListening = false
             isStopping = false
             locked = false
             onListeningChange?(false)
+
+            enqueueCleanup(raw: raw, hints: hints, chain: chain)
         }
+    }
+
+    // MARK: - Cleanup queue
+
+    // Cleanup + insert runs off the recording critical path, one job at a time in the order
+    // dictations were stopped: a slow (networked) cleanup never blocks the next recording, and
+    // back-to-back dictations still insert in sequence. The tail task chains each job behind the
+    // previous one's completion; `pendingCleanups` tracks the backlog so only the last job, and
+    // only when nothing is being recorded, hands the HUD back.
+    private var cleanupTail: Task<Void, Never> = Task {}
+    private var pendingCleanups = 0
+
+    private func enqueueCleanup(raw: String, hints: [Correction], chain: [CleanupMode]) {
+        pendingCleanups += 1
+        let previous = cleanupTail
+        cleanupTail = Task { [weak self] in
+            await previous.value
+            guard let self else { return }
+            let failed = await self.runCleanup(raw: raw, hints: hints, chain: chain)
+            self.pendingCleanups -= 1
+            guard self.pendingCleanups == 0, !self.isListening, !self.isStarting else { return }
+            if failed {
+                self.hud.showError("Cleanup failed — inserted as-is")
+            } else {
+                self.hud.hide()
+            }
+        }
+    }
+
+    /// Clean, insert, and record one dictation. Returns true if the chain had work but nothing landed.
+    private func runCleanup(raw: String, hints: [Correction], chain: [CleanupMode]) async -> Bool {
+        var text = TranscriptCleaner.clean(raw)
+        if Settings.learningEnabled {
+            text = CorrectionStore.shared.apply(to: text)
+        }
+        var cleanupFallback = false
+        if !text.isEmpty, !chain.isEmpty {
+            // Each step is tried in turn; a missing key just means that step isn't the one
+            // that cleans your text. Only a chain where nothing worked is worth mentioning.
+            let result = await CleanupChain.run(text, chain: chain, hints: hints, runStep: CleanupChain.liveStep)
+            text = result.text
+            cleanupFallback = result.allFailed
+        }
+        if !text.isEmpty {
+            // Trailing space so back-to-back dictations don't run together.
+            if let last = text.last, !last.isWhitespace { text += " " }
+            let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
+            Self.log.notice("inserting \(text.count, privacy: .public) chars into \(frontApp, privacy: .public)")
+            TextInserter.insert(text)
+            DictationHistory.shared.add(text)
+            correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
+        } else {
+            Self.log.notice("nothing to insert (empty transcript; raw was \(raw.count, privacy: .public) chars)")
+        }
+        return cleanupFallback
     }
 
     /// Name the hardware, not the setting: "System default" tells you nothing six months
