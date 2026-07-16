@@ -42,4 +42,35 @@ public enum TranscriptCleaner {
 
         return kept.joined(separator: " ")
     }
+
+    /// Whether `cleaned` is a plausible cleanup of `original` rather than a replacement.
+    ///
+    /// A cleanup pass fixes punctuation and filler; it must not rewrite. When the model instead
+    /// answers a dictated question, refuses it, or hallucinates, its output shares few words with
+    /// what the user said and often balloons in length. This returns false for those cases so the
+    /// caller keeps the user's transcript instead of pasting words they never spoke.
+    ///
+    /// Lenient toward real cleanups (which keep nearly every input word) and strict against
+    /// replacements (a refusal or answer reuses few of them).
+    public static func preservesWording(original: String, cleaned: String) -> Bool {
+        let cleanedWords = Set(wordBag(cleaned))
+        guard !cleanedWords.isEmpty else { return false }
+        // Cleanup trims filler and repairs punctuation; it never balloons the text. A refusal or
+        // an answer, on the other hand, expands a short transcript into paragraphs.
+        if cleaned.count > original.count * 2 + 40 { return false }
+        // Most distinct cleaned words must be words the user actually said.
+        let shared = cleanedWords.intersection(wordBag(original)).count
+        return Double(shared) / Double(cleanedWords.count) >= 0.5
+    }
+
+    /// Lowercased word tokens with apostrophes folded, so "What's" matches "whats".
+    private static func wordBag(_ s: String) -> Set<String> {
+        Set(
+            s.lowercased()
+                .replacingOccurrences(of: "'", with: "")
+                .replacingOccurrences(of: "\u{2019}", with: "")
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+        )
+    }
 }

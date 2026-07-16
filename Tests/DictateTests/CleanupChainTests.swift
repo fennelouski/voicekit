@@ -14,13 +14,17 @@ import VoiceKit
 struct CleanupChainTests {
     private struct Boom: Error {}
 
+    /// A realistic transcript: fixture cleanups reuse its words so they pass the
+    /// wording-preservation guard, and the step name is prefixed only to identify which step won.
+    private let input = "the quick brown fox jumps over"
+
     /// A step runner that only succeeds for the steps you name.
     private func runner(succeeding: Set<CleanupMode>, log: Log? = nil)
         -> (String, CleanupMode, [Correction]) async throws -> String {
         { text, step, _ in
             log?.append(step)
             guard succeeding.contains(step) else { throw Boom() }
-            return "cleaned by \(step.rawValue)"
+            return "\(step.rawValue) \(text)"
         }
     }
 
@@ -33,11 +37,11 @@ struct CleanupChainTests {
     @Test func firstWorkingStepWinsAndTheRestAreNeverTried() async {
         let log = Log()
         let result = await CleanupChain.run(
-            "raw",
+            input,
             chain: [.claude, .openAI, .onDevice],
             runStep: runner(succeeding: [.openAI, .onDevice], log: log)
         )
-        #expect(result.text == "cleaned by openAI")
+        #expect(result.text == "openAI \(input)")
         #expect(result.usedStep == .openAI)
         #expect(result.failed == [.claude])
         #expect(!result.allFailed)
@@ -49,7 +53,7 @@ struct CleanupChainTests {
     /// dictation. Now it's just a step that isn't the one that cleans your text.
     @Test func aMissingKeyIsNotAnErrorWhenSomethingElseWorks() async {
         let result = await CleanupChain.run(
-            "raw",
+            input,
             chain: [.claude, .onDevice],
             runStep: runner(succeeding: [.onDevice])
         )
@@ -59,7 +63,7 @@ struct CleanupChainTests {
 
     @Test func onlyACompletelyDeadChainReportsFailure() async {
         let result = await CleanupChain.run(
-            "raw",
+            input,
             chain: [.claude, .openAI, .onDevice],
             runStep: runner(succeeding: [])
         )
@@ -67,12 +71,12 @@ struct CleanupChainTests {
         #expect(result.usedStep == nil)
         #expect(result.failed == [.claude, .openAI, .onDevice])
         // Never lose the transcript.
-        #expect(result.text == "raw")
+        #expect(result.text == input)
     }
 
     @Test func anEmptyChainIsOffAndIsNotAFailure() async {
-        let result = await CleanupChain.run("raw", chain: [], runStep: runner(succeeding: []))
-        #expect(result.text == "raw")
+        let result = await CleanupChain.run(input, chain: [], runStep: runner(succeeding: []))
+        #expect(result.text == input)
         #expect(result.usedStep == nil)
         #expect(!result.allFailed, "cleanup being off is not a failure to report")
     }
@@ -81,20 +85,20 @@ struct CleanupChainTests {
     /// user's words, which is worse than not cleaning at all.
     @Test func aStepReturningNothingFallsThroughRatherThanErasingTheText() async {
         let result = await CleanupChain.run(
-            "raw",
+            input,
             chain: [.claude, .onDevice]
-        ) { _, step, _ in
-            step == .claude ? "   " : "cleaned by onDevice"
+        ) { text, step, _ in
+            step == .claude ? "   " : "onDevice \(text)"
         }
         #expect(result.usedStep == .onDevice)
-        #expect(result.text == "cleaned by onDevice")
+        #expect(result.text == "onDevice \(input)")
         #expect(result.failed == [.claude])
     }
 
     @Test func reorderingChangesWhichStepWins() async {
         let both: Set<CleanupMode> = [.claude, .onDevice]
-        let claudeFirst = await CleanupChain.run("raw", chain: [.claude, .onDevice], runStep: runner(succeeding: both))
-        let deviceFirst = await CleanupChain.run("raw", chain: [.onDevice, .claude], runStep: runner(succeeding: both))
+        let claudeFirst = await CleanupChain.run(input, chain: [.claude, .onDevice], runStep: runner(succeeding: both))
+        let deviceFirst = await CleanupChain.run(input, chain: [.onDevice, .claude], runStep: runner(succeeding: both))
         #expect(claudeFirst.usedStep == .claude)
         #expect(deviceFirst.usedStep == .onDevice)
     }
@@ -123,7 +127,7 @@ struct CleanupChainTests {
     @Test func theAddedStepActuallyRunsFirst() async {
         let chain = CleanupChain.adding(.claude, to: [.onDevice])
         let result = await CleanupChain.run(
-            "raw",
+            input,
             chain: chain,
             runStep: runner(succeeding: [.claude, .onDevice])
         )

@@ -50,6 +50,12 @@ enum CleanupChain {
                     failed.append(step)
                     continue
                 }
+                // A step that answered, refused, or otherwise rewrote the transcript isn't a
+                // cleanup — discard it so we never paste words the user didn't say.
+                guard TranscriptCleaner.preservesWording(original: text, cleaned: trimmed) else {
+                    failed.append(step)
+                    continue
+                }
                 return Result(text: trimmed, usedStep: step, failed: failed)
             } catch {
                 failed.append(step)
