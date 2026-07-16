@@ -2,8 +2,8 @@
 //  DictationHistoryTests.swift
 //  DictateTests
 //
-//  The in-memory recent-dictations store: one-hour window, newest first,
-//  empty input ignored.
+//  The persisted recent-dictations store: newest first, empty ignored, the
+//  cleanup stages round-trip through disk, and clearing wipes the file.
 //
 
 import Foundation
@@ -12,31 +12,60 @@ import Testing
 
 @MainActor
 struct DictationHistoryTests {
-
-    @Test func newestFirstWithinWindow() {
-        let history = DictationHistory()
-        let now = Date()
-        history.add("too old", at: now.addingTimeInterval(-3700))
-        history.add("first", at: now.addingTimeInterval(-120))
-        history.add("second", at: now.addingTimeInterval(-5))
-        #expect(history.recent(now: now).map(\.text) == ["second", "first"])
+    private func tempURL() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("dictate-history-\(UUID()).json")
     }
 
-    @Test func entriesExpireAsTimePasses() {
-        let history = DictationHistory()
-        let now = Date()
-        history.add("fades", at: now)
-        #expect(history.recent(now: now).count == 1)
-        #expect(history.recent(now: now.addingTimeInterval(3700)).isEmpty)
+    private func entry(_ text: String) -> DictationHistory.Entry {
+        .init(date: Date(), stages: [
+            .init(label: "Raw", systemImage: "waveform", text: text, status: .applied, changePercent: nil)
+        ])
     }
 
-    @Test func whitespaceOnlyIgnoredAndTextTrimmed() {
-        let history = DictationHistory()
-        let now = Date()
-        history.add("   ", at: now)
-        history.add("hello world \n", at: now)
-        let texts = history.recent(now: now).map(\.text)
-        #expect(texts == ["hello world"])
+    @Test func newestFirst() {
+        let history = DictationHistory(fileURL: tempURL())
+        history.add(entry("first"))
+        history.add(entry("second"))
+        history.add(entry("third"))
+        #expect(history.recent().map(\.text) == ["third", "second", "first"])
+    }
+
+    @Test func emptyEntriesAreIgnored() {
+        let history = DictationHistory(fileURL: tempURL())
+        history.add(entry("   "))
+        history.add(entry("hello world"))
+        #expect(history.recent().map(\.text) == ["hello world"])
+    }
+
+    /// The point of persisting: a relaunch (a fresh instance on the same file) still has it,
+    /// with every cleanup stage intact.
+    @Test func stagesRoundTripThroughDisk() {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let writer = DictationHistory(fileURL: url)
+        writer.add(.init(date: Date(), stages: [
+            .init(label: "Raw", systemImage: "waveform", text: "um hello world", status: .applied, changePercent: nil),
+            .init(label: "Claude", systemImage: "cloud", text: "", status: .failed, changePercent: nil),
+            .init(label: "Apple Intelligence", systemImage: "apple.logo", text: "Hello world.", status: .applied, changePercent: 40),
+        ]))
+
+        let reader = DictationHistory(fileURL: url)
+        let entries = reader.recent()
+        #expect(entries.count == 1)
+        // The inserted text is the last *applied* stage, not the failed attempt after it.
+        #expect(entries.first?.text == "Hello world.")
+        #expect(entries.first?.stages.count == 3)
+        #expect(entries.first?.stages.contains { $0.status == .failed } == true)
+    }
+
+    @Test func clearWipesMemoryAndFile() {
+        let url = tempURL()
+        let history = DictationHistory(fileURL: url)
+        history.add(entry("gone soon"))
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        history.clear()
+        #expect(history.recent().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 }
 

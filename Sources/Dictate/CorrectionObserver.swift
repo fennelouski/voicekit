@@ -23,6 +23,7 @@ enum LearningPaths {
     static var corrections: URL { directory.appendingPathComponent("corrections.json") }
     static var log: URL { directory.appendingPathComponent("learning-log.jsonl") }
     static var transcripts: URL { directory.appendingPathComponent("Transcripts", isDirectory: true) }
+    static var history: URL { directory.appendingPathComponent("history.json") }
 }
 
 extension CorrectionStore {

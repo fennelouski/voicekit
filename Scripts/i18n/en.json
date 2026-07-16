@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "unavailable on this Mac — skipped",
   "unknown": "unknown",
   "your local model": "your local model",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Recent dictations — expand one to copy any cleanup stage",
+  "Clear": "Clear",
+  "Nothing dictated recently.": "Nothing dictated recently.",
+  "· %d%% changed": "· %d%% changed",
+  "%d%% changed": "%d%% changed",
+  "no change": "no change",
+  "failed": "failed",
+  "Copy this version": "Copy this version",
+  "Raw": "Raw",
+  "Filler removed": "Filler removed",
+  "Learned corrections": "Learned corrections"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate listens to your voice to type what you say. Audio never leaves this Mac.",

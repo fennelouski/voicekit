@@ -208,26 +208,57 @@ final class DictationController {
     }
 
     /// Clean, insert, and record one dictation. Returns true if the chain had work but nothing landed.
+    ///
+    /// Every version the text passes through is kept as a history stage — raw, filler removed,
+    /// learned corrections, and the AI polish (plus any providers that failed) — so a rewrite
+    /// that went too far can be seen and recovered from Recent Dictations.
     private func runCleanup(raw: String, hints: [Correction], chain: [CleanupMode]) async -> Bool {
+        var stages: [DictationHistory.Stage] = [
+            .init(label: String(localized: "Raw"), systemImage: "waveform", text: raw,
+                  status: .applied, changePercent: nil)
+        ]
+        var previous = raw
+        // Record an applied stage only when it actually changed the text — an identical
+        // "filler removed" rung is just noise.
+        func record(_ label: String, _ image: String, _ next: String, force: Bool = false) {
+            guard force || next != previous else { return }
+            stages.append(.init(label: label, systemImage: image, text: next, status: .applied,
+                                changePercent: TextDistance.changePercent(from: previous, to: next)))
+            previous = next
+        }
+
         var text = TranscriptCleaner.clean(raw)
+        record(String(localized: "Filler removed"), "scissors", text)
         if Settings.learningEnabled {
             text = CorrectionStore.shared.apply(to: text)
+            record(String(localized: "Learned corrections"), "brain", text)
         }
+
         var cleanupFallback = false
         if !text.isEmpty, !chain.isEmpty {
             // Each step is tried in turn; a missing key just means that step isn't the one
             // that cleans your text. Only a chain where nothing worked is worth mentioning.
             let result = await CleanupChain.run(text, chain: chain, hints: hints, runStep: CleanupChain.liveStep)
+            // Providers are tried in chain order: the ones that failed come before the winner.
+            for step in result.failed {
+                stages.append(.init(label: step.chainName, systemImage: step.systemImage, text: "",
+                                    status: .failed, changePercent: nil))
+            }
+            if let used = result.usedStep {
+                // Force it in even at 0% — "Apple Intelligence ran and changed nothing" is worth showing.
+                record(used.chainName, used.systemImage, result.text, force: true)
+            }
             text = result.text
             cleanupFallback = result.allFailed
         }
+
         if !text.isEmpty {
+            DictationHistory.shared.add(.init(date: Date(), stages: stages))
             // Trailing space so back-to-back dictations don't run together.
             if let last = text.last, !last.isWhitespace { text += " " }
             let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
             Self.log.notice("inserting \(text.count, privacy: .public) chars into \(frontApp, privacy: .public)")
             TextInserter.insert(text)
-            DictationHistory.shared.add(text)
             correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
         } else {
             Self.log.notice("nothing to insert (empty transcript; raw was \(raw.count, privacy: .public) chars)")
