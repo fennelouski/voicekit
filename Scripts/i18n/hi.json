@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "इस Mac पर अनुपलब्ध — छोड़ा गया",
   "unknown": "अज्ञात",
   "your local model": "आपका स्थानीय मॉडल",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "हाल के डिक्टेशन — किसी भी सफ़ाई चरण को कॉपी करने के लिए एक को विस्तृत करें",
+  "Clear": "साफ़ करें",
+  "Nothing dictated recently.": "हाल ही में कुछ भी डिक्टेट नहीं किया गया।",
+  "· %d%% changed": "· %d%% बदला",
+  "%d%% changed": "%d%% बदला",
+  "no change": "कोई बदलाव नहीं",
+  "failed": "विफल",
+  "Copy this version": "यह संस्करण कॉपी करें",
+  "Raw": "कच्चा",
+  "Filler removed": "भराव शब्द हटाए गए",
+  "Learned corrections": "सीखे गए सुधार"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate आपकी आवाज़ सुनता है ताकि आप जो कहें उसे टाइप कर सके। ऑडियो कभी इस Mac को नहीं छोड़ता।",

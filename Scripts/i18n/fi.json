@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "ei käytettävissä tässä Macissa – ohitettu",
   "unknown": "tuntematon",
   "your local model": "paikallinen mallisi",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Viimeaikaiset sanelut – laajenna yksi kopioidaksesi minkä tahansa puhdistusvaiheen",
+  "Clear": "Tyhjennä",
+  "Nothing dictated recently.": "Ei mitään saneltua äskettäin.",
+  "· %d%% changed": "· %d%% muutettu",
+  "%d%% changed": "%d%% muutettu",
+  "no change": "ei muutosta",
+  "failed": "epäonnistui",
+  "Copy this version": "Kopioi tämä versio",
+  "Raw": "Raaka",
+  "Filler removed": "Täytesanat poistettu",
+  "Learned corrections": "Opitut korjaukset"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate kuuntelee ääntäsi kirjoittaakseen sen, mitä sanot. Ääni ei koskaan poistu tästä Macista.",

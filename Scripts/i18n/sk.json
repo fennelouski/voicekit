@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "nie je k dispozícii na tomto Macu — preskočené",
   "unknown": "neznáme",
   "your local model": "váš lokálny model",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Nedávne diktovania – rozbaľte jedno a skopírujte ľubovoľnú fázu čistenia",
+  "Clear": "Vymazať",
+  "Nothing dictated recently.": "V poslednom čase nič nenadiktované.",
+  "· %d%% changed": "· zmenené %d%%",
+  "%d%% changed": "zmenené %d%%",
+  "no change": "bez zmeny",
+  "failed": "zlyhalo",
+  "Copy this version": "Kopírovať túto verziu",
+  "Raw": "Nespracované",
+  "Filler removed": "Výplňové slová odstránené",
+  "Learned corrections": "Naučené opravy"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate počúva váš hlas, aby písal to, čo hovoríte. Zvuk nikdy neopustí tento Mac.",

@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "недоступно на цьому Mac — пропущено",
   "unknown": "невідомо",
   "your local model": "ваша локальна модель",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Нещодавні диктування — розгорніть одне, щоб скопіювати будь-який етап очищення",
+  "Clear": "Очистити",
+  "Nothing dictated recently.": "Нещодавно нічого не продиктовано.",
+  "· %d%% changed": "· змінено %d%%",
+  "%d%% changed": "змінено %d%%",
+  "no change": "без змін",
+  "failed": "не вдалося",
+  "Copy this version": "Скопіювати цю версію",
+  "Raw": "Необроблений",
+  "Filler removed": "Слова-паразити видалено",
+  "Learned corrections": "Вивчені виправлення"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate слухає ваш голос, щоб друкувати те, що ви кажете. Аудіо ніколи не залишає цей Mac.",

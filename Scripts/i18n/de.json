@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "auf diesem Mac nicht verfügbar – übersprungen",
   "unknown": "unbekannt",
   "your local model": "Ihr lokales Modell",
-  "— %@": "– %@"
+  "— %@": "– %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Letzte Diktate – erweitern Sie eines, um eine beliebige Bereinigungsstufe zu kopieren",
+  "Clear": "Löschen",
+  "Nothing dictated recently.": "Kürzlich nichts diktiert.",
+  "· %d%% changed": "· %d%% geändert",
+  "%d%% changed": "%d%% geändert",
+  "no change": "keine Änderung",
+  "failed": "fehlgeschlagen",
+  "Copy this version": "Diese Version kopieren",
+  "Raw": "Roh",
+  "Filler removed": "Füllwörter entfernt",
+  "Learned corrections": "Gelernte Korrekturen"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate hört Ihre Stimme, um zu tippen, was Sie sagen. Audio verlässt diesen Mac nie.",

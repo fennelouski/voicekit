@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "tidak tersedia pada Mac ini — dilangkau",
   "unknown": "tidak diketahui",
   "your local model": "model tempatan anda",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Imlak terkini — kembangkan satu untuk menyalin mana-mana peringkat pembersihan",
+  "Clear": "Kosongkan",
+  "Nothing dictated recently.": "Tiada apa-apa diimlak baru-baru ini.",
+  "· %d%% changed": "· %d%% berubah",
+  "%d%% changed": "%d%% berubah",
+  "no change": "tiada perubahan",
+  "failed": "gagal",
+  "Copy this version": "Salin versi ini",
+  "Raw": "Mentah",
+  "Filler removed": "Perkataan pengisi dibuang",
+  "Learned corrections": "Pembetulan yang dipelajari"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate mendengar suara anda untuk menaip apa yang anda sebut. Audio tidak pernah meninggalkan Mac ini.",

@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "indisponibil pe acest Mac — omis",
   "unknown": "necunoscut",
   "your local model": "modelul tău local",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Dictări recente — extinde una pentru a copia orice etapă de curățare",
+  "Clear": "Șterge",
+  "Nothing dictated recently.": "Nimic dictat recent.",
+  "· %d%% changed": "· %d%% modificat",
+  "%d%% changed": "%d%% modificat",
+  "no change": "nicio modificare",
+  "failed": "a eșuat",
+  "Copy this version": "Copiază această versiune",
+  "Raw": "Brut",
+  "Filler removed": "Cuvinte de umplutură eliminate",
+  "Learned corrections": "Corecții învățate"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate îți ascultă vocea ca să scrie ceea ce spui. Sunetul nu părăsește niciodată acest Mac.",

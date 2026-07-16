@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "μη διαθέσιμο σε αυτό το Mac — παραλείφθηκε",
   "unknown": "άγνωστο",
   "your local model": "το τοπικό σας μοντέλο",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Πρόσφατες υπαγορεύσεις — αναπτύξτε μία για να αντιγράψετε οποιοδήποτε στάδιο καθαρισμού",
+  "Clear": "Εκκαθάριση",
+  "Nothing dictated recently.": "Τίποτα δεν υπαγορεύτηκε πρόσφατα.",
+  "· %d%% changed": "· άλλαξε %d%%",
+  "%d%% changed": "άλλαξε %d%%",
+  "no change": "καμία αλλαγή",
+  "failed": "απέτυχε",
+  "Copy this version": "Αντιγραφή αυτής της έκδοσης",
+  "Raw": "Ακατέργαστο",
+  "Filler removed": "Αφαιρέθηκαν οι λέξεις γεμίσματος",
+  "Learned corrections": "Διορθώσεις που έμαθε"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Το Dictate ακούει τη φωνή σας για να πληκτρολογεί ό,τι λέτε. Ο ήχος δεν φεύγει ποτέ από αυτό το Mac.",

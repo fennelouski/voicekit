@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "ไม่พร้อมใช้งานบน Mac เครื่องนี้ — ข้ามไป",
   "unknown": "ไม่ทราบ",
   "your local model": "โมเดลในเครื่องของคุณ",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "การบอกเขียนล่าสุด — ขยายรายการหนึ่งเพื่อคัดลอกขั้นตอนการล้างใดก็ได้",
+  "Clear": "ล้าง",
+  "Nothing dictated recently.": "ไม่มีการบอกเขียนเมื่อเร็ว ๆ นี้",
+  "· %d%% changed": "· เปลี่ยนไป %d%%",
+  "%d%% changed": "เปลี่ยนไป %d%%",
+  "no change": "ไม่มีการเปลี่ยนแปลง",
+  "failed": "ล้มเหลว",
+  "Copy this version": "คัดลอกเวอร์ชันนี้",
+  "Raw": "ดิบ",
+  "Filler removed": "ลบคำเสริมแล้ว",
+  "Learned corrections": "การแก้ไขที่เรียนรู้"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate ฟังเสียงของคุณเพื่อพิมพ์สิ่งที่คุณพูด เสียงจะไม่ออกจาก Mac เครื่องนี้เลย",

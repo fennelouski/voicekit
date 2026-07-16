@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "inte tillgänglig på den här datorn — hoppas över",
   "unknown": "okänd",
   "your local model": "din lokala modell",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Senaste dikteringar – expandera en för att kopiera valfritt rensningssteg",
+  "Clear": "Rensa",
+  "Nothing dictated recently.": "Inget dikterat nyligen.",
+  "· %d%% changed": "· %d%% ändrat",
+  "%d%% changed": "%d%% ändrat",
+  "no change": "ingen ändring",
+  "failed": "misslyckades",
+  "Copy this version": "Kopiera den här versionen",
+  "Raw": "Rå",
+  "Filler removed": "Utfyllnadsord borttagna",
+  "Learned corrections": "Inlärda rättelser"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate lyssnar på din röst för att skriva det du säger. Ljud lämnar aldrig den här datorn.",

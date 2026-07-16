@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "此 Mac 上無法使用——已略過",
   "unknown": "未知",
   "your local model": "你的本機模型",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "最近的聽寫 — 展開一則以複製任何清理階段",
+  "Clear": "清除",
+  "Nothing dictated recently.": "最近沒有聽寫內容。",
+  "· %d%% changed": "· 已變更 %d%%",
+  "%d%% changed": "已變更 %d%%",
+  "no change": "無變更",
+  "failed": "失敗",
+  "Copy this version": "拷貝此版本",
+  "Raw": "原始",
+  "Filler removed": "已移除填充詞",
+  "Learned corrections": "已學習的修正"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate 會聆聽你的聲音以輸入你所說的內容。音訊絕不會離開這台 Mac。",

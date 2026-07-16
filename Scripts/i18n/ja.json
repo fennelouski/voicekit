@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "このMacでは利用不可 — スキップ",
   "unknown": "不明",
   "your local model": "あなたのローカルモデル",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "最近のディクテーション — いずれかを展開して任意のクリーンアップ段階をコピー",
+  "Clear": "消去",
+  "Nothing dictated recently.": "最近ディクテーションはありません。",
+  "· %d%% changed": "· %d%% 変更",
+  "%d%% changed": "%d%% 変更",
+  "no change": "変更なし",
+  "failed": "失敗",
+  "Copy this version": "このバージョンをコピー",
+  "Raw": "生",
+  "Filler removed": "フィラー語を削除",
+  "Learned corrections": "学習した修正"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictateはあなたの声を聞き取り、話した内容を入力します。音声がこのMacから出ることはありません。",

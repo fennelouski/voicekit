@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "niet beschikbaar op deze Mac — overgeslagen",
   "unknown": "onbekend",
   "your local model": "je lokale model",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Recente dictaten — vouw er een uit om een willekeurige opschoonstap te kopiëren",
+  "Clear": "Wissen",
+  "Nothing dictated recently.": "Recent niets gedicteerd.",
+  "· %d%% changed": "· %d%% gewijzigd",
+  "%d%% changed": "%d%% gewijzigd",
+  "no change": "geen wijziging",
+  "failed": "mislukt",
+  "Copy this version": "Deze versie kopiëren",
+  "Raw": "Onbewerkt",
+  "Filler removed": "Stopwoorden verwijderd",
+  "Learned corrections": "Geleerde correcties"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate luistert naar je stem om te typen wat je zegt. Audio verlaat deze Mac nooit.",

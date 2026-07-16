@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "bu Mac’te kullanılamıyor — atlandı",
   "unknown": "bilinmiyor",
   "your local model": "yerel modeliniz",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Son dikteler — herhangi bir temizlik aşamasını kopyalamak için birini genişletin",
+  "Clear": "Temizle",
+  "Nothing dictated recently.": "Son zamanlarda hiçbir şey dikte edilmedi.",
+  "· %d%% changed": "· %d%% değişti",
+  "%d%% changed": "%d%% değişti",
+  "no change": "değişiklik yok",
+  "failed": "başarısız",
+  "Copy this version": "Bu sürümü kopyala",
+  "Raw": "Ham",
+  "Filler removed": "Dolgu sözcükleri kaldırıldı",
+  "Learned corrections": "Öğrenilen düzeltmeler"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate, söylediklerinizi yazmak için sesinizi dinler. Ses bu Mac’ten asla ayrılmaz.",

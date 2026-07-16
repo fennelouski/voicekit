@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "không khả dụng trên máy Mac này — đã bỏ qua",
   "unknown": "không rõ",
   "your local model": "mô hình cục bộ của bạn",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Bản đọc chính tả gần đây — mở rộng một bản để sao chép bất kỳ giai đoạn dọn dẹp nào",
+  "Clear": "Xóa",
+  "Nothing dictated recently.": "Gần đây chưa đọc chính tả gì.",
+  "· %d%% changed": "· đã thay đổi %d%%",
+  "%d%% changed": "đã thay đổi %d%%",
+  "no change": "không thay đổi",
+  "failed": "thất bại",
+  "Copy this version": "Sao chép phiên bản này",
+  "Raw": "Thô",
+  "Filler removed": "Đã xóa từ đệm",
+  "Learned corrections": "Các chỉnh sửa đã học"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate lắng nghe giọng nói của bạn để gõ những gì bạn nói. Âm thanh không bao giờ rời khỏi máy Mac này.",

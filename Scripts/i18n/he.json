@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "לא זמין ב-Mac הזה — דולג",
   "unknown": "לא ידוע",
   "your local model": "המודל המקומי שלך",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "הכתבות אחרונות — הרחב אחת כדי להעתיק כל שלב ניקוי",
+  "Clear": "נקה",
+  "Nothing dictated recently.": "לא הוכתב דבר לאחרונה.",
+  "· %d%% changed": "· %d%% שונה",
+  "%d%% changed": "%d%% שונה",
+  "no change": "ללא שינוי",
+  "failed": "נכשל",
+  "Copy this version": "העתק גרסה זו",
+  "Raw": "גולמי",
+  "Filler removed": "מילות מילוי הוסרו",
+  "Learned corrections": "תיקונים שנלמדו"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate מאזין לקולך כדי להקליד את מה שאתה אומר. האודיו לעולם אינו עוזב את ה-Mac הזה.",

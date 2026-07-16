@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "nem érhető el ezen a Macen – kihagyva",
   "unknown": "ismeretlen",
   "your local model": "a helyi modelled",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Legutóbbi diktálások – bontson ki egyet bármely tisztítási fázis másolásához",
+  "Clear": "Törlés",
+  "Nothing dictated recently.": "Mostanában semmit sem diktált.",
+  "· %d%% changed": "· %d%% módosult",
+  "%d%% changed": "%d%% módosult",
+  "no change": "nincs változás",
+  "failed": "sikertelen",
+  "Copy this version": "Ez a verzió másolása",
+  "Raw": "Nyers",
+  "Filler removed": "Töltelékszavak eltávolítva",
+  "Learned corrections": "Megtanult javítások"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "A Dictate hallgatja a hangodat, hogy leírja, amit mondasz. A hang soha nem hagyja el ezt a Macet.",

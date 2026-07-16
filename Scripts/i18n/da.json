@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "ikke tilgængelig på denne Mac — sprunget over",
   "unknown": "ukendt",
   "your local model": "din lokale model",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Seneste dikteringer – udvid en for at kopiere et hvilket som helst oprydningstrin",
+  "Clear": "Ryd",
+  "Nothing dictated recently.": "Intet dikteret for nylig.",
+  "· %d%% changed": "· %d%% ændret",
+  "%d%% changed": "%d%% ændret",
+  "no change": "ingen ændring",
+  "failed": "mislykkedes",
+  "Copy this version": "Kopier denne version",
+  "Raw": "Rå",
+  "Filler removed": "Fyldord fjernet",
+  "Learned corrections": "Lærte rettelser"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate lytter til din stemme for at skrive, hvad du siger. Lyd forlader aldrig denne Mac.",

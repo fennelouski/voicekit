@@ -224,7 +224,18 @@
   "unavailable on this Mac — skipped": "nije dostupno na ovom Macu — preskočeno",
   "unknown": "nepoznato",
   "your local model": "vaš lokalni model",
-  "— %@": "— %@"
+  "— %@": "— %@",
+  "Recent dictations — expand one to copy any cleanup stage": "Nedavni diktati – proširite jedan da kopirate bilo koji korak čišćenja",
+  "Clear": "Očisti",
+  "Nothing dictated recently.": "Ništa nedavno nije diktirano.",
+  "· %d%% changed": "· promijenjeno %d%%",
+  "%d%% changed": "promijenjeno %d%%",
+  "no change": "bez promjena",
+  "failed": "neuspjeh",
+  "Copy this version": "Kopiraj ovu verziju",
+  "Raw": "Sirovo",
+  "Filler removed": "Poštapalice uklonjene",
+  "Learned corrections": "Naučeni ispravci"
  },
  "InfoPlist": {
   "NSMicrophoneUsageDescription": "Dictate sluša vaš glas da bi tipkao ono što govorite. Zvuk nikad ne napušta ovaj Mac.",
