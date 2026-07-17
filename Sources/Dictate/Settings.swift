@@ -241,6 +241,23 @@ enum ClaudeModel: String, CaseIterable, Identifiable {
     }
 }
 
+/// Where the spoken-command → literal pass runs relative to the AI cleanup chain.
+enum FormattingPosition: String, CaseIterable, Identifiable {
+    /// Before the AI pass: the model sees the punctuation and capitalizes/polishes around it.
+    case beforeCleanup
+    /// After the AI pass: the literals are the last word, untouched by any model.
+    case afterCleanup
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .beforeCleanup: return String(localized: "Before AI cleanup")
+        case .afterCleanup: return String(localized: "After AI cleanup")
+        }
+    }
+}
+
 enum Settings {
     static let hotkeyKey = "dictate_hotkey"
     static let localeKey = "dictate_localeId"
@@ -263,6 +280,8 @@ enum Settings {
     static let settingsPaneKey = "dictate_settingsPane"
     static let learningEnabledKey = "dictate_learningEnabled"
     static let conversationTranscriptsKey = "dictate_conversationTranscripts"
+    static let spokenCommandsEnabledKey = "dictate_spokenCommandsEnabled"
+    static let spokenCommandsPositionKey = "dictate_spokenCommandsPosition"
     /// Pre-cloud boolean toggle; read only to migrate into cleanupMode.
     static let legacyAICleanupKey = "dictate_aiCleanup"
 
@@ -427,6 +446,16 @@ enum Settings {
     /// Learn corrections from how the user edits inserted text. Default on.
     static var learningEnabled: Bool {
         UserDefaults.standard.object(forKey: learningEnabledKey) as? Bool ?? true
+    }
+
+    /// Convert spoken formatting commands ("colon", "new line") into literals. Default on.
+    static var spokenCommandsEnabled: Bool {
+        UserDefaults.standard.object(forKey: spokenCommandsEnabledKey) as? Bool ?? true
+    }
+
+    /// Where that conversion runs in the cleanup flow. Default before the AI pass.
+    static var spokenCommandsPosition: FormattingPosition {
+        FormattingPosition(rawValue: UserDefaults.standard.string(forKey: spokenCommandsPositionKey) ?? "") ?? .beforeCleanup
     }
 
     /// Save a speaker-labeled transcript to disk while dictating. Default on: it stays on

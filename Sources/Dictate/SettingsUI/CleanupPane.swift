@@ -14,6 +14,8 @@ import VoiceKit
 struct CleanupPane: View {
     @AppStorage(Settings.cleanupChainKey) private var chainRaw = Settings.encodeChain(Settings.cleanupChain)
     @AppStorage(Settings.cleanupInstructionsKey) private var cleanupInstructions = ""
+    @AppStorage(Settings.spokenCommandsEnabledKey) private var spokenCommandsEnabled = true
+    @AppStorage(Settings.spokenCommandsPositionKey) private var spokenCommandsPosition = FormattingPosition.beforeCleanup.rawValue
 
     private var chain: [CleanupMode] { Settings.decodeChain(chainRaw) }
 
@@ -102,6 +104,26 @@ struct CleanupPane: View {
                 } header: {
                     SettingsLabel(String(localized: "Instructions"), systemImage: "text.quote", tint: SettingsTint.cleanup)
                 }
+            }
+
+            Section {
+                Toggle(isOn: $spokenCommandsEnabled) {
+                    Text("Convert spoken commands")
+                }
+                if spokenCommandsEnabled {
+                    Picker(selection: $spokenCommandsPosition) {
+                        ForEach(FormattingPosition.allCases) { position in
+                            Text(position.displayName).tag(position.rawValue)
+                        }
+                    } label: {
+                        Text("Run")
+                    }
+                }
+                Text("Say \"colon\", \"new line\", \"open paren\" and the like to insert the punctuation itself instead of the words — the way Dictation does. Run it before AI cleanup and the model capitalizes around the punctuation; run it after and the model never touches your literals.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                SettingsLabel(String(localized: "Spoken Commands"), systemImage: "textformat", tint: SettingsTint.cleanup)
             }
         }
         .formStyle(.grouped)

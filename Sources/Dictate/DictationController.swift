@@ -234,6 +234,17 @@ final class DictationController {
             record(String(localized: "Learned corrections"), "brain", text)
         }
 
+        // Spoken formatting commands ("colon", "new line", ...) become literals. The user chooses
+        // whether this runs and where: before the AI pass (the model capitalizes and polishes
+        // around the punctuation) or after it (the model never touches the literals).
+        func applyFormatting() {
+            text = SpokenCommands.apply(text)
+            record(String(localized: "Formatting"), "textformat", text)
+        }
+        if Settings.spokenCommandsEnabled, Settings.spokenCommandsPosition == .beforeCleanup {
+            applyFormatting()
+        }
+
         var cleanupFallback = false
         if !text.isEmpty, !chain.isEmpty {
             // Each step is tried in turn; a missing key just means that step isn't the one
@@ -250,6 +261,10 @@ final class DictationController {
             }
             text = result.text
             cleanupFallback = result.allFailed
+        }
+
+        if Settings.spokenCommandsEnabled, Settings.spokenCommandsPosition == .afterCleanup {
+            applyFormatting()
         }
 
         if !text.isEmpty {
