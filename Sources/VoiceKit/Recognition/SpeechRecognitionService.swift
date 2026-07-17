@@ -211,6 +211,27 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
         // Set up audio engine and tap
         let inputNode = audioEngine.inputNode
+
+        // Pin the selected input device BEFORE reading the format — a non-default mic can have a
+        // different native sample rate/channel count, and the tap must match the device we'll
+        // actually capture from. Throwing here is clean: no tap is installed yet.
+        #if os(macOS)
+        if let deviceID = inputDeviceID, let audioUnit = inputNode.audioUnit {
+            var id = deviceID
+            let err = AudioUnitSetProperty(
+                audioUnit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &id,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+            if err != noErr {
+                throw RecognitionError.engineStartFailed(NSError(domain: NSOSStatusErrorDomain, code: Int(err), userInfo: [NSLocalizedDescriptionKey: "Failed to set input device"]))
+            }
+        }
+        #endif
+
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
         // installTap throws an uncatchable ObjC exception (SIGABRT) if the format is invalid —
@@ -255,23 +276,6 @@ public actor SpeechRecognitionService: TranscriptionProvider {
             }
         }
         isTapInstalled = true
-
-        #if os(macOS)
-        if let deviceID = inputDeviceID, let audioUnit = inputNode.audioUnit {
-            var id = deviceID
-            let err = AudioUnitSetProperty(
-                audioUnit,
-                kAudioOutputUnitProperty_CurrentDevice,
-                kAudioUnitScope_Global,
-                0,
-                &id,
-                UInt32(MemoryLayout<AudioDeviceID>.size)
-            )
-            if err != noErr {
-                throw RecognitionError.engineStartFailed(NSError(domain: NSOSStatusErrorDomain, code: Int(err), userInfo: [NSLocalizedDescriptionKey: "Failed to set input device"]))
-            }
-        }
-        #endif
 
         do {
             try audioEngine.start()

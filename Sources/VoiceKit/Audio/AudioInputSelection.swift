@@ -187,12 +187,31 @@ public enum AudioInputSelection {
         }
         guard err == noErr else { return [] }
         var result = [SelectableDevice]()
-        for deviceId in deviceIds where deviceId != 0 {
+        for deviceId in deviceIds where deviceId != 0 && hasInputChannels(deviceId) {
             if let name = deviceName(deviceId) {
                 result.append(SelectableDevice(id: "\(deviceId)", name: name))
             }
         }
         return result
+    }
+
+    /// True if the device has at least one input channel — filters out output-only
+    /// devices (speakers, DisplayPort audio, aggregate outputs) from the mic picker.
+    private static func hasInputChannels(_ deviceId: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(deviceId, &address, 0, nil, &size) == noErr, size > 0 else { return false }
+        // Allocate raw bytes, not AudioBufferList.allocate(maximumBuffers:) — an output-only device
+        // reports a zero-buffer list on the input scope, and allocate(maximumBuffers: 0) traps.
+        let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        guard AudioObjectGetPropertyData(deviceId, &address, 0, nil, &size, raw) == noErr else { return false }
+        let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+        return list.contains { $0.mNumberChannels > 0 }
     }
 
     private static func deviceName(_ deviceId: AudioDeviceID) -> String? {
