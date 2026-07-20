@@ -246,10 +246,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showSettings() {
         if settingsController == nil {
-            settingsController = SettingsWindowController { [weak self] in
-                self?.settingsController?.close()
-                self?.showOnboarding()
-            }
+            settingsController = SettingsWindowController(
+                onWelcome: { [weak self] in
+                    self?.settingsController?.close()
+                    self?.showOnboarding()
+                },
+                onShowHistory: { [weak self] in self?.historyPanel.toggle() }
+            )
         }
         settingsController?.show()
     }

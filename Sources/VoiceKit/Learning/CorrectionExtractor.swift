@@ -10,7 +10,7 @@ import Foundation
 
 /// A single learned substitution: recognition produced `heard`,
 /// the user changed it to `corrected`.
-public struct Correction: Codable, Equatable, Sendable {
+public struct Correction: Codable, Equatable, Hashable, Sendable {
     public let heard: String
     public let corrected: String
 

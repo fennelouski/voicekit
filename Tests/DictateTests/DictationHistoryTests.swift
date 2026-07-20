@@ -67,6 +67,43 @@ struct DictationHistoryTests {
         #expect(history.recent().isEmpty)
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
+
+    @Test func disablingHistoryStopsRecordingNewEntries() {
+        let saved = UserDefaults.standard.object(forKey: Settings.dictationHistoryEnabledKey)
+        defer { UserDefaults.standard.set(saved, forKey: Settings.dictationHistoryEnabledKey) }
+
+        let history = DictationHistory(fileURL: tempURL())
+        UserDefaults.standard.set(false, forKey: Settings.dictationHistoryEnabledKey)
+        history.add(entry("should not be kept"))
+        #expect(history.recent().isEmpty)
+
+        UserDefaults.standard.set(true, forKey: Settings.dictationHistoryEnabledKey)
+        history.add(entry("kept"))
+        #expect(history.recent().map(\.text) == ["kept"])
+    }
+
+    @Test func retentionWindowDropsOldEntriesOnRead() {
+        let savedEnabled = UserDefaults.standard.object(forKey: Settings.dictationHistoryEnabledKey)
+        let savedRetention = UserDefaults.standard.string(forKey: Settings.dictationHistoryRetentionKey)
+        defer {
+            UserDefaults.standard.set(savedEnabled, forKey: Settings.dictationHistoryEnabledKey)
+            UserDefaults.standard.set(savedRetention, forKey: Settings.dictationHistoryRetentionKey)
+        }
+        UserDefaults.standard.set(true, forKey: Settings.dictationHistoryEnabledKey)
+
+        // Forever while writing, so both an old and a fresh entry land on disk.
+        UserDefaults.standard.set(HistoryRetention.forever.rawValue, forKey: Settings.dictationHistoryRetentionKey)
+        let history = DictationHistory(fileURL: tempURL())
+        history.add(.init(date: Date().addingTimeInterval(-10 * 86_400), stages: [
+            .init(label: "Raw", systemImage: "waveform", text: "ten days old", status: .applied, changePercent: nil),
+        ]))
+        history.add(entry("just now"))
+        #expect(history.recent().map(\.text) == ["just now", "ten days old"])
+
+        // Shortening the window prunes the old entry on the very next read, no relaunch needed.
+        UserDefaults.standard.set(HistoryRetention.day.rawValue, forKey: Settings.dictationHistoryRetentionKey)
+        #expect(history.recent().map(\.text) == ["just now"])
+    }
 }
 
 /// The session record at the foot of every transcript.

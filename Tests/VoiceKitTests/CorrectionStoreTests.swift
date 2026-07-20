@@ -95,4 +95,55 @@ struct CorrectionStoreTests {
         #expect(store.apply(to: "cooper") == "cooper")
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
+
+    @Test func historyTracksManualEditsBeforeThreshold() {
+        let (store, _) = makeStore()
+        store.record([cooper]) // below threshold: manual only, not yet auto-applied
+        let entry = store.history().first { $0.correction == cooper }
+        #expect(entry?.manualCount == 1)
+        #expect(entry?.autoCount == 0)
+        #expect(entry?.isActive == false)
+    }
+
+    @Test func historyCountsAutomaticApplicationsSeparately() {
+        let (store, _) = makeStore()
+        store.record([cooper])
+        store.record([cooper]) // crosses the threshold
+        _ = store.apply(to: "cooper near the cooper cluster") // two matches in one pass
+        let entry = store.history().first { $0.correction == cooper }
+        #expect(entry?.manualCount == 2)
+        #expect(entry?.autoCount == 2)
+        #expect(entry?.isActive == true)
+    }
+
+    @Test func historyIsSortedByTotalUsageDescending() {
+        let (store, _) = makeStore()
+        let rare = Correction(heard: "reddis", corrected: "Redis")
+        store.record([cooper])
+        store.record([cooper])
+        store.record([cooper])
+        store.record([rare])
+        let ordered = store.history()
+        #expect(ordered.first?.correction == cooper)
+    }
+
+    @Test func historySurvivesAnUnlearnedReversal() {
+        // Undoing an auto-applied correction still counts as a real manual edit.
+        let (store, _) = makeStore()
+        store.record([cooper])
+        store.record([cooper])
+        store.record([Correction(heard: "Kubernetes", corrected: "cooper")])
+        let entry = store.history().first { $0.correction == cooper }
+        #expect(entry?.manualCount == 2)
+        #expect(entry?.isActive == false) // unlearned back below threshold
+    }
+
+    @Test func resetClearsHistoryToo() {
+        let (store, _) = makeStore()
+        store.record([cooper])
+        store.record([cooper])
+        _ = store.apply(to: "cooper")
+        store.reset()
+        #expect(store.history().isEmpty)
+    }
 }

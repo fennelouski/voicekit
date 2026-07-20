@@ -20,6 +20,7 @@ enum SettingsTint {
     static let appearance = Color.pink
     static let learning = Color.orange
     static let conversation = Color.red
+    static let history = Color.brown
     static let privacy = Color.indigo
     static let system = Color.gray
 }

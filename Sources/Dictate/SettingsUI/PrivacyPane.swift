@@ -13,10 +13,16 @@ import VoiceKit
 
 @available(macOS 26.0, *)
 struct PrivacyPane: View {
+    var onShowHistory: () -> Void = {}
+
     @AppStorage(Settings.learningEnabledKey) private var learningEnabled = true
     @AppStorage(Settings.conversationTranscriptsKey) private var conversationTranscripts = true
+    @AppStorage(Settings.dictationHistoryEnabledKey) private var dictationHistoryEnabled = true
+    @AppStorage(Settings.dictationHistoryRetentionKey) private var retentionRaw = HistoryRetention.month.rawValue
 
     @State private var correctionsCleared = false
+    @State private var historyCleared = false
+    @State private var correctionHistory: [CorrectionStore.HistoryEntry] = []
 
     var body: some View {
         Form {
@@ -42,16 +48,47 @@ struct PrivacyPane: View {
                         Button("Reset learned corrections") {
                             CorrectionStore.shared.reset()
                             correctionsCleared = true
+                            correctionHistory = []
                         }
                         if correctionsCleared {
                             Label("Cleared", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                         }
                     }
+
+                    if !correctionHistory.isEmpty {
+                        Divider()
+                        Text("Corrections Learned")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(correctionHistory.prefix(20), id: \.correction) { entry in
+                            HStack(spacing: 6) {
+                                if entry.isActive {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.green)
+                                        .help("Applied automatically")
+                                }
+                                Text("\(entry.correction.heard) → \(entry.correction.corrected)")
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Spacer(minLength: 8)
+                                Text(String(format: String(localized: "%d manual · %d auto"), entry.manualCount, entry.autoCount))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if correctionHistory.count > 20 {
+                            Text(String(format: String(localized: "+ %d more"), correctionHistory.count - 20))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
             } header: {
                 SettingsLabel(String(localized: "Learning"), systemImage: "brain", tint: SettingsTint.learning)
             }
+            .task { correctionHistory = CorrectionStore.shared.history() }
 
             Section {
                 Toggle("Save conversation transcripts", isOn: $conversationTranscripts)
@@ -87,6 +124,36 @@ struct PrivacyPane: View {
                 }
             } header: {
                 SettingsLabel(String(localized: "Transcripts"), systemImage: "doc.text", tint: SettingsTint.privacy)
+            }
+
+            Section {
+                Toggle("Keep dictation history", isOn: $dictationHistoryEnabled)
+
+                Text("Every dictation keeps every version the cleanup pipeline produced, so you can recover an earlier one if a cleanup pass rewrote more than you wanted. Turning this off stops new dictations from being recorded — it doesn't erase what's already saved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if dictationHistoryEnabled {
+                    Picker("Keep history for", selection: $retentionRaw.asEnum(HistoryRetention.month)) {
+                        ForEach(HistoryRetention.allCases) { retention in
+                            Text(retention.displayName).tag(retention)
+                        }
+                    }
+                }
+
+                HStack {
+                    Button("Show Recent Dictations") { onShowHistory() }
+                    Button("Clear History") {
+                        DictationHistory.shared.clear()
+                        historyCleared = true
+                    }
+                    if historyCleared {
+                        Label("Cleared", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                }
+            } header: {
+                SettingsLabel(String(localized: "Dictation History"), systemImage: "clock.arrow.circlepath", tint: SettingsTint.history)
             }
         }
         .formStyle(.grouped)

@@ -258,6 +258,33 @@ enum FormattingPosition: String, CaseIterable, Identifiable {
     }
 }
 
+/// How long Recent Dictations keeps entries before dropping them, regardless of the
+/// hard 100-entry cap `DictationHistory` also enforces.
+enum HistoryRetention: String, CaseIterable, Identifiable {
+    case day, week, month, forever
+
+    var id: String { rawValue }
+
+    /// Nil means no time-based pruning — only the entry-count cap applies.
+    var days: Int? {
+        switch self {
+        case .day: return 1
+        case .week: return 7
+        case .month: return 30
+        case .forever: return nil
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .day: return String(localized: "1 Day")
+        case .week: return String(localized: "1 Week")
+        case .month: return String(localized: "1 Month")
+        case .forever: return String(localized: "Forever")
+        }
+    }
+}
+
 enum Settings {
     static let hotkeyKey = "dictate_hotkey"
     static let localeKey = "dictate_localeId"
@@ -282,6 +309,8 @@ enum Settings {
     static let conversationTranscriptsKey = "dictate_conversationTranscripts"
     static let conversationRecordingKey = "dictate_conversationRecording"
     static let conversationSourcesKey = "dictate_conversationSources"
+    static let dictationHistoryEnabledKey = "dictate_dictationHistoryEnabled"
+    static let dictationHistoryRetentionKey = "dictate_dictationHistoryRetention"
     static let spokenCommandsEnabledKey = "dictate_spokenCommandsEnabled"
     static let spokenCommandsPositionKey = "dictate_spokenCommandsPosition"
     /// Pre-cloud boolean toggle; read only to migrate into cleanupMode.
@@ -482,6 +511,16 @@ enum Settings {
     static func saveConversationSources(_ sources: [ConversationSource]) {
         guard let data = try? JSONEncoder().encode(sources) else { return }
         UserDefaults.standard.set(String(decoding: data, as: UTF8.self), forKey: conversationSourcesKey)
+    }
+
+    /// Keep a local record of recent dictations for the Recent Dictations panel (⌃⌥⌘V).
+    /// Default on — it's the only way to recover a paste you didn't mean to lose.
+    static var dictationHistoryEnabled: Bool {
+        UserDefaults.standard.object(forKey: dictationHistoryEnabledKey) as? Bool ?? true
+    }
+
+    static var dictationHistoryRetention: HistoryRetention {
+        HistoryRetention(rawValue: UserDefaults.standard.string(forKey: dictationHistoryRetentionKey) ?? "") ?? .month
     }
 }
 #endif

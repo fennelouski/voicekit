@@ -159,7 +159,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @StateObject private var permissions = PermissionModel()
 
-    private let stepCount = 4
+    private let stepCount = 5
 
     var body: some View {
         VStack(spacing: 0) {
@@ -168,6 +168,7 @@ struct OnboardingView: View {
                 case 0: WelcomeStep()
                 case 1: PermissionsStep(model: permissions)
                 case 2: FnKeyStep(model: permissions)
+                case 3: LaunchAtLoginStep()
                 default: DoneStep()
                 }
             }
@@ -427,6 +428,43 @@ private struct FnKeyStep: View {
         default:
             Label("Fn currently opens the emoji picker", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
+        }
+    }
+}
+
+/// Surfaced during onboarding — not just left as a Settings toggle — because someone who
+/// dictates once, restarts their Mac, and finds Dictate silently gone is likely to assume
+/// it's broken rather than realize this was never turned on.
+@available(macOS 26.0, *)
+private struct LaunchAtLoginStep: View {
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "power")
+                .font(.system(size: 44, weight: .medium))
+                .foregroundStyle(.tint)
+
+            Text("Keep Dictate running")
+                .font(.system(size: 26, weight: .bold))
+            Text("Dictate waits quietly in the menu bar for your hotkey. Without this, restarting your Mac stops it until you reopen it yourself.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+
+            Toggle("Launch Dictate at login", isOn: $launchAtLogin)
+                .toggleStyle(.switch)
+                .controlSize(.large)
+                .onChange(of: launchAtLogin) { _, enabled in
+                    launchAtLogin = LaunchAtLogin.setEnabled(enabled)
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 12).fill(.quinary))
+                .padding(.top, 10)
+
+            Text("You can change this anytime in Settings.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 4)
         }
     }
 }

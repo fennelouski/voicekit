@@ -66,21 +66,37 @@ final class DictationHistory {
            let decoded = try? JSONDecoder().decode([Entry].self, from: data) {
             entries = decoded
         }
+        prune()
     }
 
     func add(_ entry: Entry) {
+        guard Settings.dictationHistoryEnabled else { return }
         guard !entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         entries.append(entry)
-        if entries.count > cap { entries.removeFirst(entries.count - cap) }
+        prune()
         save()
     }
 
-    /// Newest first.
-    func recent() -> [Entry] { entries.reversed() }
+    /// Newest first. Prunes first so a shortened retention setting takes effect
+    /// immediately, not just after the next dictation.
+    func recent() -> [Entry] {
+        prune()
+        return entries.reversed()
+    }
 
     func clear() {
         entries = []
         try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    /// Drops entries older than the configured retention window, then enforces the
+    /// hard cap — which still applies even at "Forever", so history can't grow unbounded.
+    private func prune() {
+        if let days = Settings.dictationHistoryRetention.days {
+            let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
+            entries.removeAll { $0.date < cutoff }
+        }
+        if entries.count > cap { entries.removeFirst(entries.count - cap) }
     }
 
     private func save() {

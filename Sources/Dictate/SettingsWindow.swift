@@ -75,8 +75,8 @@ final class SettingsWindowController: NSWindowController {
 
     /// `onWelcome` closes this window and opens the guide — AppDelegate owns both, so it
     /// hands the action down rather than the view reaching back up for it.
-    convenience init(onWelcome: @escaping () -> Void) {
-        let hosting = NSHostingController(rootView: SettingsView(onWelcome: onWelcome))
+    convenience init(onWelcome: @escaping () -> Void, onShowHistory: @escaping () -> Void = {}) {
+        let hosting = NSHostingController(rootView: SettingsView(onWelcome: onWelcome, onShowHistory: onShowHistory))
         // The default, .preferredContentSize, makes the window track SwiftUI's intrinsic size —
         // which fights a resizable split view and pins the window to whichever pane is showing.
         hosting.sizingOptions = []
@@ -105,6 +105,7 @@ final class SettingsWindowController: NSWindowController {
 @available(macOS 26.0, *)
 struct SettingsView: View {
     var onWelcome: () -> Void = {}
+    var onShowHistory: () -> Void = {}
 
     @AppStorage(Settings.settingsPaneKey) private var paneRaw = SettingsPane.general.rawValue
 
@@ -222,7 +223,7 @@ struct SettingsView: View {
         case .cleanup: CleanupPane()
         case .appearance: AppearancePane()
         case .conversation: ConversationPane()
-        case .privacy: PrivacyPane()
+        case .privacy: PrivacyPane(onShowHistory: onShowHistory)
         }
     }
 }

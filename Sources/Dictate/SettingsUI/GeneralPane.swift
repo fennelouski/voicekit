@@ -6,7 +6,6 @@
 //
 
 #if os(macOS)
-import ServiceManagement
 import SwiftUI
 
 @available(macOS 26.0, *)
@@ -15,7 +14,7 @@ struct GeneralPane: View {
     @AppStorage(Settings.showMenuBarIconKey) private var showMenuBarIcon = true
 
     /// Not a default — the real state lives in ServiceManagement, so we read it back on every appear.
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     var body: some View {
         Form {
@@ -69,16 +68,7 @@ struct GeneralPane: View {
 
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
-                        do {
-                            if enabled {
-                                try SMAppService.mainApp.register()
-                            } else {
-                                try SMAppService.mainApp.unregister()
-                            }
-                        } catch {
-                            // macOS refused; don't leave the toggle claiming something untrue.
-                            launchAtLogin = SMAppService.mainApp.status == .enabled
-                        }
+                        launchAtLogin = LaunchAtLogin.setEnabled(enabled)
                     }
 
                 Text("Dictate starts hidden and waits for your hotkey.")
