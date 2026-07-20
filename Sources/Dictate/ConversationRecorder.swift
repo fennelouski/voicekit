@@ -166,6 +166,28 @@ actor ConversationRecorder {
 /// The session record at the foot of a transcript. Pure and ungated so it can be tested
 /// without a diarizer, a microphone, or macOS 26.
 enum TranscriptFooter {
+    /// Footer for multi-input conversation recordings: one line per named source.
+    static func render(
+        sources: [String],
+        started: Date,
+        stopped: Date?,
+        locale: Locale = .autoupdatingCurrent,
+        timeZone: TimeZone = .current
+    ) -> String {
+        var footer = "---\n\n"
+        for source in sources {
+            footer += "- **Source:** \(source)\n"
+        }
+        footer += "- **Started:** \(timestamp(started, locale: locale, timeZone: timeZone))\n"
+        if let stopped {
+            footer += "- **Stopped:** \(timestamp(stopped, locale: locale, timeZone: timeZone))\n"
+            footer += "- **Duration:** \(durationText(stopped.timeIntervalSince(started)))\n"
+        } else {
+            footer += "- **Stopped:** still recording\n"
+        }
+        return footer
+    }
+
     static func render(
         microphone: String,
         started: Date,

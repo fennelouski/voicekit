@@ -280,6 +280,8 @@ enum Settings {
     static let settingsPaneKey = "dictate_settingsPane"
     static let learningEnabledKey = "dictate_learningEnabled"
     static let conversationTranscriptsKey = "dictate_conversationTranscripts"
+    static let conversationRecordingKey = "dictate_conversationRecording"
+    static let conversationSourcesKey = "dictate_conversationSources"
     static let spokenCommandsEnabledKey = "dictate_spokenCommandsEnabled"
     static let spokenCommandsPositionKey = "dictate_spokenCommandsPosition"
     /// Pre-cloud boolean toggle; read only to migrate into cleanupMode.
@@ -462,6 +464,24 @@ enum Settings {
     /// this Mac, and it's the only record of what you actually said.
     static var conversationTranscripts: Bool {
         UserDefaults.standard.object(forKey: conversationTranscriptsKey) as? Bool ?? true
+    }
+
+    /// Multi-input conversation recording (named mics + app audio → merged transcript).
+    /// Opt-in and default off; nothing about normal dictation changes when it's off.
+    static var conversationRecordingEnabled: Bool {
+        UserDefaults.standard.bool(forKey: conversationRecordingKey)
+    }
+
+    /// The conversation-source roster, JSON in one defaults key (same one-key idiom as
+    /// cleanupChain). Corrupt or missing data reads as an empty roster.
+    static var conversationSources: [ConversationSource] {
+        guard let data = UserDefaults.standard.string(forKey: conversationSourcesKey)?.data(using: .utf8) else { return [] }
+        return (try? JSONDecoder().decode([ConversationSource].self, from: data)) ?? []
+    }
+
+    static func saveConversationSources(_ sources: [ConversationSource]) {
+        guard let data = try? JSONEncoder().encode(sources) else { return }
+        UserDefaults.standard.set(String(decoding: data, as: UTF8.self), forKey: conversationSourcesKey)
     }
 }
 #endif

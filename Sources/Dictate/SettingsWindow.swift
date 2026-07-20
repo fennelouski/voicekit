@@ -16,6 +16,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case input
     case cleanup
     case appearance
+    case conversation
     case privacy
 
     var id: String { rawValue }
@@ -26,6 +27,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .input: return String(localized: "Input")
         case .cleanup: return String(localized: "Cleanup")
         case .appearance: return String(localized: "Appearance")
+        case .conversation: return String(localized: "Conversation")
         case .privacy: return String(localized: "Privacy")
         }
     }
@@ -38,6 +40,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .input: return String(localized: "Language and microphone")
         case .cleanup: return String(localized: "Which model polishes your words")
         case .appearance: return String(localized: "The popup you see while dictating")
+        case .conversation: return String(localized: "Record several people to one transcript")
         case .privacy: return String(localized: "Learned corrections, transcripts")
         }
     }
@@ -48,6 +51,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .input: return "mic"
         case .cleanup: return "wand.and.sparkles"
         case .appearance: return "paintbrush"
+        case .conversation: return "person.2.wave.2"
         case .privacy: return "hand.raised"
         }
     }
@@ -58,6 +62,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .input: return SettingsTint.input
         case .cleanup: return SettingsTint.cleanup
         case .appearance: return SettingsTint.appearance
+        case .conversation: return SettingsTint.conversation
         case .privacy: return SettingsTint.privacy
         }
     }
@@ -216,6 +221,7 @@ struct SettingsView: View {
         case .input: InputPane()
         case .cleanup: CleanupPane()
         case .appearance: AppearancePane()
+        case .conversation: ConversationPane()
         case .privacy: PrivacyPane()
         }
     }

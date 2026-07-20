@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var termsController: TermsWindowController?
     private var toggleMenuItem: NSMenuItem?
     private var hintMenuItem: NSMenuItem?
+    private let conversationController = ConversationSessionController()
+    private var conversationMenuItem: NSMenuItem?
+    private var dictationListening = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         updateStatusItemVisibility()
@@ -45,10 +48,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         controller.onListeningChange = { [weak self] listening in
+            self?.dictationListening = listening
             self?.updateStatusIcon(listening: listening)
             self?.toggleMenuItem?.title = listening
                 ? String(localized: "Stop Dictation")
                 : String(localized: "Start Dictation")
+        }
+
+        conversationController.onStateChange = { [weak self] state in
+            guard let self else { return }
+            self.updateStatusIcon(listening: self.dictationListening)
+            guard let item = self.conversationMenuItem else { return }
+            switch state {
+            case .idle:
+                item.title = String(localized: "Record Conversation")
+                item.action = #selector(self.toggleConversationRecording)
+            case .recording:
+                item.title = String(localized: "Stop Recording Conversation")
+                item.action = #selector(self.toggleConversationRecording)
+            case .transcribing:
+                // No action → the item grays out until the transcript is written.
+                item.title = String(localized: "Transcribing Conversation…")
+                item.action = nil
+            }
         }
 
         hotkeyMonitor.onKeyDown = { [weak self] in self?.controller.hotkeyDown() }
@@ -74,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.hintMenuItem?.title = String(
                     format: String(localized: "Hold %@ to dictate"), Settings.hotkey.displayName
                 )
+                self.conversationMenuItem?.isHidden = !Settings.conversationRecordingEnabled
                 self.updateStatusItemVisibility()
             }
         }
@@ -116,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem = nil
             toggleMenuItem = nil
             hintMenuItem = nil
+            conversationMenuItem = nil
         }
     }
 
@@ -143,6 +167,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggle.target = self
         menu.addItem(toggle)
         toggleMenuItem = toggle
+        // Only surfaces once conversation recording is enabled in Settings — the menu is
+        // byte-identical for everyone else.
+        let conversationItem = NSMenuItem(
+            title: conversationController.isRecording
+                ? String(localized: "Stop Recording Conversation")
+                : String(localized: "Record Conversation"),
+            action: #selector(toggleConversationRecording), keyEquivalent: ""
+        )
+        conversationItem.target = self
+        conversationItem.isHidden = !Settings.conversationRecordingEnabled
+        menu.addItem(conversationItem)
+        conversationMenuItem = conversationItem
         let historyItem = NSMenuItem(title: String(localized: "Recent Dictations"), action: #selector(showHistory), keyEquivalent: "v")
         historyItem.keyEquivalentModifierMask = [.control, .option, .command]
         historyItem.target = self
@@ -166,7 +202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusIcon(listening: Bool) {
-        let name = listening ? "mic.fill" : "mic"
+        // Dictation's live state wins; a running conversation shows the record glyph.
+        let name = listening ? "mic.fill" : (conversationController.isRecording ? "record.circle" : "mic")
         let image = NSImage(systemSymbolName: name, accessibilityDescription: "Dictate")
         image?.isTemplate = true
         statusItem?.button?.image = image
@@ -174,6 +211,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleDictation() {
         controller.toggleManual()
+    }
+
+    @objc private func toggleConversationRecording() {
+        conversationController.toggle()
     }
 
     @objc private func showHistory() {

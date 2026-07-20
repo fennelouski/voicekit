@@ -162,6 +162,34 @@ public enum AudioInputSelection {
     #endif
 
     #if os(macOS)
+    /// The device's persistent UID (`kAudioDevicePropertyDeviceUID`). Unlike the numeric
+    /// `AudioDeviceID`, the UID is stable across reboots and unplugs — use it for storage.
+    public static func deviceUID(for deviceId: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var uidRef: CFString?
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        let err = withUnsafeMutablePointer(to: &uidRef) { ptr in
+            AudioObjectGetPropertyData(deviceId, &address, 0, nil, &size, ptr)
+        }
+        guard err == noErr, let cf = uidRef else { return nil }
+        return cf as String
+    }
+
+    /// Resolve a stored device UID back to the current numeric device ID, or nil if the
+    /// device isn't connected right now.
+    public static func deviceID(forUID uid: String) -> AudioDeviceID? {
+        for device in availableDevicesMacOS() {
+            if let deviceId = AudioDeviceID(device.id), deviceUID(for: deviceId) == uid {
+                return deviceId
+            }
+        }
+        return nil
+    }
+
     private static func availableDevicesMacOS() -> [SelectableDevice] {
         var size: UInt32 = 0
         var address = AudioObjectPropertyAddress(
