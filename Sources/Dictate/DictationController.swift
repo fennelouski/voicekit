@@ -269,6 +269,7 @@ final class DictationController {
 
         if !text.isEmpty {
             DictationHistory.shared.add(.init(date: Date(), stages: stages))
+            Settings.recordDictationCompleted()
             // Trailing space so back-to-back dictations don't run together.
             if let last = text.last, !last.isWhitespace { text += " " }
             let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"

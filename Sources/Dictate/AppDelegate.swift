@@ -29,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationListening = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Touch it now so "first used" in About reflects the real first launch,
+        // not whenever someone happens to open the panel for the first time.
+        _ = Settings.firstLaunchDate
         updateStatusItemVisibility()
 
         // Nothing else runs until the current Terms are accepted. Covers new installs and,

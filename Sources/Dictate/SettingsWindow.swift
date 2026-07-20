@@ -108,6 +108,7 @@ struct SettingsView: View {
     var onShowHistory: () -> Void = {}
 
     @AppStorage(Settings.settingsPaneKey) private var paneRaw = SettingsPane.general.rawValue
+    @State private var showingAbout = false
 
     private var pane: SettingsPane { SettingsPane(rawValue: paneRaw) ?? .general }
 
@@ -115,24 +116,52 @@ struct SettingsView: View {
         NavigationSplitView {
             // Cards rather than list rows: five bare rows left most of the sidebar empty,
             // and the room was better spent saying what's in each pane.
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(SettingsPane.allCases) { pane in
-                        card(pane)
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(SettingsPane.allCases) { pane in
+                            card(pane)
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        welcomeCard
                     }
-
-                    Divider()
-                        .padding(.vertical, 4)
-
-                    welcomeCard
+                    .padding(10)
                 }
-                .padding(10)
+                versionFooter
             }
             .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
         } detail: {
             detail
                 .navigationTitle(pane.title)
         }
+    }
+
+    /// Pinned below the scrolling pane list — version at a glance, and a way in to usage
+    /// stats and debug info without cluttering any one pane with them.
+    private var versionFooter: some View {
+        HStack(spacing: 4) {
+            Text(String(format: String(localized: "Version %@"), AppInfo.version))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button {
+                showingAbout = true
+            } label: {
+                Image(systemName: "questionmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "About Dictate"))
+            .popover(isPresented: $showingAbout, arrowEdge: .trailing) {
+                AboutPanel()
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .top) { Divider() }
     }
 
     /// An action, not a pane — it's below a divider and never draws as selected, because it

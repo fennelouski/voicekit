@@ -311,6 +311,8 @@ enum Settings {
     static let conversationSourcesKey = "dictate_conversationSources"
     static let dictationHistoryEnabledKey = "dictate_dictationHistoryEnabled"
     static let dictationHistoryRetentionKey = "dictate_dictationHistoryRetention"
+    static let totalDictationsKey = "dictate_totalDictations"
+    static let firstLaunchDateKey = "dictate_firstLaunchDate"
     static let spokenCommandsEnabledKey = "dictate_spokenCommandsEnabled"
     static let spokenCommandsPositionKey = "dictate_spokenCommandsPosition"
     /// Pre-cloud boolean toggle; read only to migrate into cleanupMode.
@@ -521,6 +523,26 @@ enum Settings {
 
     static var dictationHistoryRetention: HistoryRetention {
         HistoryRetention(rawValue: UserDefaults.standard.string(forKey: dictationHistoryRetentionKey) ?? "") ?? .month
+    }
+
+    /// Lifetime count of completed dictations — unlike Dictation History, never pruned
+    /// or affected by the retention setting. Purely a usage number for the About panel.
+    static var totalDictations: Int {
+        UserDefaults.standard.integer(forKey: totalDictationsKey)
+    }
+
+    static func recordDictationCompleted() {
+        UserDefaults.standard.set(totalDictations + 1, forKey: totalDictationsKey)
+    }
+
+    /// Set once, the first time anything reads it — effectively "first launch."
+    static var firstLaunchDate: Date {
+        if let existing = UserDefaults.standard.object(forKey: firstLaunchDateKey) as? Date {
+            return existing
+        }
+        let now = Date()
+        UserDefaults.standard.set(now, forKey: firstLaunchDateKey)
+        return now
     }
 }
 #endif
