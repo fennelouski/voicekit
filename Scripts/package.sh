@@ -22,7 +22,9 @@ DMG=build/Dictate.dmg
 Scripts/make-app.sh >/dev/null
 
 # 2. Re-sign for distribution: Developer ID + hardened runtime + entitlements + secure timestamp.
-#    The hardened runtime and timestamp are what notarization requires.
+#    The hardened runtime and timestamp are what notarization requires. Sparkle's embedded
+#    helpers need the same treatment (no app entitlements) and must be signed before the app.
+Scripts/embed-sparkle.sh "$APP" "$IDENTITY" --options runtime --timestamp
 codesign --force --options runtime --timestamp \
     --entitlements Scripts/Dictate.entitlements \
     --sign "$IDENTITY" "$APP"
@@ -46,6 +48,27 @@ hdiutil create -volname Dictate -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/de
 rm -rf "$STAGE"
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
 xcrun stapler staple "$DMG"
+
+# 5. Build the Sparkle update artifact + appcast. Sparkle installs from a zip of the
+#    *stapled* app; generate_appcast signs it with the EdDSA key created once via
+#    Sparkle's generate_keys (stored in the login keychain). Non-fatal so the DMG still
+#    ships if the key isn't set up yet.
+GEN=$(find .build -type f -name generate_appcast | head -1)
+if [ -n "$GEN" ]; then
+    UPDATES=build/updates
+    mkdir -p "$UPDATES"
+    VERSION=$(defaults read "$PWD/$APP/Contents/Info" CFBundleShortVersionString)
+    ditto -c -k --keepParent "$APP" "$UPDATES/Dictate-$VERSION.zip"
+    if "$GEN" --download-url-prefix "https://nathanfennel.com/downloads/" "$UPDATES"; then
+        echo "Appcast: $UPDATES/appcast.xml"
+        echo "Publish BOTH $UPDATES/Dictate-$VERSION.zip and $UPDATES/appcast.xml to /downloads/ (alongside the DMG)."
+    else
+        echo "generate_appcast failed — generate the EdDSA key once, then re-run:"
+        echo "  \"\$(find .build -name generate_keys | head -1)\"   # prints SUPublicEDKey for Info.plist"
+    fi
+else
+    echo "Sparkle tools not found (run 'swift build' first) — skipped appcast generation."
+fi
 
 echo
 echo "Built $DMG — upload it to your website."

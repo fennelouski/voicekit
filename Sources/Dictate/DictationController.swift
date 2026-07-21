@@ -274,8 +274,12 @@ final class DictationController {
             if let last = text.last, !last.isWhitespace { text += " " }
             let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
             Self.log.notice("inserting \(text.count, privacy: .public) chars into \(frontApp, privacy: .public)")
-            TextInserter.insert(text)
-            correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
+            if TextInserter.insert(text) {
+                correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
+            } else {
+                Self.log.error("accessibility denied — left \(text.count, privacy: .public) chars on the clipboard")
+                hud.showError(String(localized: "Accessibility denied — press ⌘V to paste"))
+            }
         } else {
             Self.log.notice("nothing to insert (empty transcript; raw was \(raw.count, privacy: .public) chars)")
         }

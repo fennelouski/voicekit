@@ -4,6 +4,14 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>Dictate</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>studio.100apps.Dictate</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>
@@ -47,38 +55,40 @@
 		<string>zh-Hant</string>
 		<string>zh-HK</string>
 	</array>
-	<key>CFBundleExecutable</key>
-	<string>Dictate</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>CFBundleIdentifier</key>
-	<string>studio.100apps.Dictate</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Dictate</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.0</string>
+	<string>1.2.1</string>
 	<key>CFBundleVersion</key>
-	<string>3</string>
+	<string>4</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Dictate listens to your voice to type what you say. Audio never leaves this Mac.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Dictate transcribes your speech on-device. No audio or text is sent anywhere.</string>
-	<key>NSAudioCaptureUsageDescription</key>
-	<string>Dictate captures another app's audio only during a conversation recording you start. Audio never leaves this Mac.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Dictate captures another app's audio only during a conversation recording you start. Audio never leaves this Mac.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dictate listens to your voice to type what you say. Audio never leaves this Mac.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Dictate transcribes your speech on-device. No audio or text is sent anywhere.</string>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://nathanfennel.com/downloads/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>EVIc3OgRfDph2xDZgmLkjrHOdI8S249jGppr8MHTMCs=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>604800</integer>
 </dict>
 </plist>

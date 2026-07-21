@@ -10,6 +10,7 @@
 import AppKit
 import AVFoundation
 import Carbon.HIToolbox
+import Sparkle
 import VoiceKit
 
 @available(macOS 26.0, *)
@@ -27,6 +28,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let conversationController = ConversationSessionController()
     private var conversationMenuItem: NSMenuItem?
     private var dictationListening = false
+
+    // Starts Sparkle's scheduled background checks. Cadence + silent-install behaviour
+    // are driven entirely by the SU* keys in Info.plist (weekly check, auto-install on
+    // relaunch). Sparkle stages, EdDSA-verifies, and atomically swaps the update; any
+    // failure leaves the current working app untouched — that's the fallback, for free.
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Touch it now so "first used" in About reflects the real first launch,
@@ -196,6 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let welcomeItem = NSMenuItem(title: String(localized: "Welcome Guide…"), action: #selector(showWelcomeGuide), keyEquivalent: "")
         welcomeItem.target = self
         menu.addItem(welcomeItem)
+        // Updates install themselves on relaunch; this is just the manual "check now" escape hatch.
+        let updatesItem = NSMenuItem(
+            title: String(localized: "Check for Updates…"),
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: ""
+        )
+        updatesItem.target = updaterController
+        menu.addItem(updatesItem)
         let termsItem = NSMenuItem(title: String(localized: "Terms of Service…"), action: #selector(showTermsReadOnly), keyEquivalent: "")
         termsItem.target = self
         menu.addItem(termsItem)

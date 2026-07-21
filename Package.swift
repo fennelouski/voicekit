@@ -22,6 +22,8 @@ let package = Package(
     dependencies: [
         // Speaker diarization (on-device CoreML). Dictate-only; VoiceKit stays dependency-free.
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.9.0"),
+        // Auto-update for the notarized macOS build (the standard non-App-Store updater).
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
         .target(
@@ -35,6 +37,7 @@ let package = Package(
             dependencies: [
                 "VoiceKit",
                 .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5),

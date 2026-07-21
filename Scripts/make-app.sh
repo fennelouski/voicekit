@@ -23,13 +23,16 @@ cp -R Resources/*.lproj "$APP/Contents/Resources/"
 # Prefer a stable signing identity: ad-hoc signatures change every build,
 # which makes macOS forget the mic/Accessibility permission grants.
 IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development|Developer ID Application/{print $2; exit}')
-if [ -n "${IDENTITY:-}" ]; then
-    codesign --force --sign "$IDENTITY" "$APP"
-    echo "Signed with: $IDENTITY"
-else
-    codesign --force --sign - "$APP"
+IDENTITY="${IDENTITY:--}"   # fall back to ad-hoc
+
+# Embed + sign Sparkle before signing the app, so the app signature covers it.
+Scripts/embed-sparkle.sh "$APP" "$IDENTITY"
+codesign --force --sign "$IDENTITY" "$APP"
+if [ "$IDENTITY" = "-" ]; then
     echo "Signed ad-hoc (no Apple Development identity found)."
     echo "Note: permission grants reset on each rebuild with ad-hoc signing."
+else
+    echo "Signed with: $IDENTITY"
 fi
 
 echo "Built $APP — launch with: open $APP"

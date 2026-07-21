@@ -17,8 +17,23 @@ enum TextInserter {
     private static var savedClipboard: String?
     private static var restoreWork: DispatchWorkItem?
 
-    static func insert(_ text: String) {
+    /// Returns false when Accessibility is denied: the text is on the clipboard but ⌘V was
+    /// never delivered, so the caller has to say so rather than let it fail silently.
+    @discardableResult
+    static func insert(_ text: String) -> Bool {
         let pasteboard = NSPasteboard.general
+
+        // A stale TCC grant (same bundle id, different signature) leaves the toggle looking
+        // on in System Settings while every posted event is dropped. Leave the transcript on
+        // the clipboard, skip the restore, and let the user paste it themselves.
+        guard AXIsProcessTrusted() else {
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            restoreWork?.cancel()
+            restoreWork = nil
+            savedClipboard = nil
+            return false
+        }
 
         if let pending = restoreWork {
             pending.cancel() // mid-run: keep the original saved clipboard
@@ -48,6 +63,7 @@ enum TextInserter {
         }
         restoreWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+        return true
     }
 }
 #endif
