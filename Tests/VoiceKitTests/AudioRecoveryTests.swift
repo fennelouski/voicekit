@@ -45,6 +45,140 @@ struct ObjCExceptionTests {
     }
 }
 
+struct SafeTapTests {
+
+    /// A node that raises the way `AVAudioEngine.inputNode` does when its cached idea of the
+    /// hardware format has gone stale. The real one only misbehaves with real hardware
+    /// attached — a player or mixer node quietly accepts any format you hand it — so the
+    /// retry policy can't be exercised without standing in for it.
+    private final class PickyNode: AVAudioMixerNode {
+        /// The format of each install attempt, in order.
+        private(set) var attempts: [AVAudioFormat?] = []
+        private(set) var removals = 0
+        /// Formats to reject. Nil in here means even the bus format is refused.
+        var rejects: (AVAudioFormat?) -> Bool = { _ in false }
+        var raisesOnRemove = false
+
+        override func installTap(
+            onBus bus: AVAudioNodeBus,
+            bufferSize: AVAudioFrameCount,
+            format: AVAudioFormat?,
+            block tapBlock: @escaping AVAudioNodeTapBlock
+        ) {
+            attempts.append(format)
+            guard !rejects(format) else {
+                NSException(
+                    name: .invalidArgumentException,
+                    reason: "required condition is false: format.sampleRate == hwFormat.sampleRate",
+                    userInfo: nil
+                ).raise()
+                return
+            }
+            super.installTap(onBus: bus, bufferSize: bufferSize, format: format, block: tapBlock)
+        }
+
+        override func removeTap(onBus bus: AVAudioNodeBus) {
+            removals += 1
+            if raisesOnRemove {
+                NSException(name: .internalInconsistencyException, reason: "node is gone", userInfo: nil).raise()
+                return
+            }
+            super.removeTap(onBus: bus)
+        }
+    }
+
+    /// Attached and connected, because a detached node raises on `removeTap` for reasons that
+    /// have nothing to do with what's being tested here.
+    private func makeNode() -> (PickyNode, AVAudioEngine) {
+        let engine = AVAudioEngine()
+        let node = PickyNode()
+        engine.attach(node)
+        engine.connect(node, to: engine.mainMixerNode, format: nil)
+        return (node, engine)
+    }
+
+    private func format(sampleRate: Double, channels: AVAudioChannelCount) throws -> AVAudioFormat {
+        try #require(AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: channels, interleaved: false
+        ))
+    }
+
+    @Test func aFormatTheHardwareAcceptsIsInstalledAsAsked() throws {
+        let (node, engine) = makeNode()
+        defer { engine.stop() }
+        let wanted = try format(sampleRate: 44_100, channels: 1)
+
+        try node.installTapSafely(onBus: 0, bufferSize: 1024, format: wanted, block: { _, _ in })
+
+        #expect(node.attempts.count == 1)
+        #expect(node.attempts.first ?? nil === wanted)
+    }
+
+    /// The whole reason this wrapper exists: unplug headphones mid-session and the engine goes
+    /// on reporting the old format, which `installTap` answers with a raise rather than an
+    /// error. Falling back to the bus format is what keeps that a recoverable hiccup.
+    @Test func aStaleFormatIsRetriedAgainstTheBusFormat() throws {
+        let (node, engine) = makeNode()
+        defer { engine.stop() }
+        let stale = try format(sampleRate: 48_000, channels: 2)
+        node.rejects = { $0 != nil }
+
+        try node.installTapSafely(onBus: 0, bufferSize: 1024, format: stale, block: { _, _ in })
+
+        #expect(node.attempts.count == 2)
+        #expect(node.attempts.first ?? nil === stale)
+        // Nil, not another guess: it tells the engine to use whatever the bus really is.
+        #expect(node.attempts.last ?? nil == nil)
+    }
+
+    @Test func aNodeThatRefusesEvenItsOwnBusFormatReportsTheFailure() throws {
+        let (node, engine) = makeNode()
+        defer { engine.stop() }
+        node.rejects = { _ in true }
+
+        #expect(throws: (any Error).self) {
+            try node.installTapSafely(
+                onBus: 0, bufferSize: 1024, format: try self.format(sampleRate: 48_000, channels: 2),
+                block: { _, _ in }
+            )
+        }
+        #expect(node.attempts.count == 2)
+    }
+
+    /// channelCount 0 — no input device, or a mic that isn't awake yet — is the case the retry
+    /// can't save, because AVFoundation traps on it deep inside rather than raising where
+    /// anything can catch it. It must never reach the node at all.
+    @Test func aFormatWithNoChannelsIsNeverHandedToTheNode() throws {
+        let (node, engine) = makeNode()
+        defer { engine.stop() }
+        node.rejects = { $0 != nil }
+        let empty = try #require(AVAudioFormat(streamDescription: &emptyStreamDescription))
+
+        try node.installTapSafely(onBus: 0, bufferSize: 1024, format: empty, block: { _, _ in })
+
+        #expect(node.attempts == [nil])
+    }
+
+    @Test func removingATapFromHardwareThatHasGoneAwayIsSurvivable() {
+        let (node, engine) = makeNode()
+        defer { engine.stop() }
+        node.raisesOnRemove = true
+        node.removeTapSafely(onBus: 0) // must not take the process with it
+        #expect(node.removals == 1)
+    }
+}
+
+/// 0 channels at 0 Hz: `AVAudioFormat`'s convenience initialisers refuse to build this, which
+/// is exactly why the stream-description route is needed to reproduce what the input node
+/// reports when there's no microphone.
+private nonisolated(unsafe) var emptyStreamDescription = AudioStreamBasicDescription(
+    mSampleRate: 0,
+    mFormatID: kAudioFormatLinearPCM,
+    mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+    mBytesPerPacket: 0, mFramesPerPacket: 1, mBytesPerFrame: 0,
+    mChannelsPerFrame: 0, mBitsPerChannel: 32, mReserved: 0
+)
+
 struct CaptureHeartbeatTests {
 
     @Test func silenceGrowsUntilABufferArrives() async throws {
@@ -331,6 +465,19 @@ struct SelectedInputResolutionTests {
         #expect(storage.string(forKey: "deviceId") != chosen.id)
         #expect(AudioInputSelection.resolveSelectedDeviceID(storage: storage) == expected)
         #expect(AudioInputSelection.selectedDeviceTag(storage: storage) == chosen.id)
+    }
+
+    /// A device that can't produce a UID is not written down as a number. Core Audio reuses
+    /// those numbers, so the saved selection would eventually open different hardware while
+    /// still looking correct — the system default is the honest answer instead.
+    @Test func aDeviceWithNoUIDIsNotSavedAsItsNumber() {
+        let storage = Storage(deviceId: nil)
+        AudioInputSelection.saveSelection(
+            device: SelectableDevice(id: "424242", name: "Gone by the time you read this"),
+            input: nil, storage: storage
+        )
+        #expect(storage.string(forKey: "deviceId") == nil)
+        #expect(AudioInputSelection.resolveSelectedDeviceID(storage: storage) == nil)
     }
 
     /// A selection saved before Dictate stored UIDs is honoured *and* upgraded, so it stops

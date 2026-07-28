@@ -44,8 +44,10 @@ public extension AVAudioNode {
         }
 
         // Idempotent: removeTap is a no-op when there is none, and clears one left behind
-        // by a session that was interrupted between installing and removing.
-        removeTap(onBus: bus)
+        // by a session that was interrupted between installing and removing. Safely, because
+        // a node whose hardware has gone away raises here too — and being unable to remove a
+        // tap that was never there must not be what stops the next one being installed.
+        removeTapSafely(onBus: bus)
 
         do {
             try catchingObjCException {
@@ -57,7 +59,7 @@ public extension AVAudioNode {
             logger.error("tap format rejected: \(error, privacy: .public) — retrying with the bus format")
         }
 
-        removeTap(onBus: bus)
+        removeTapSafely(onBus: bus)
         try catchingObjCException {
             self.installTap(onBus: bus, bufferSize: bufferSize, format: nil, block: block)
         }
