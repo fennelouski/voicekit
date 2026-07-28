@@ -87,6 +87,11 @@ struct LiveCaptureRecoveryTests {
         guard #available(macOS 26.0, *) else { return }
         guard SpeechRecognitionService.authorizationStatus() == .authorized else { return }
         guard let uid = defaultInputUID(), let aggregate = makeAggregate(over: uid) else { return }
+        // The test destroys this itself, mid-session — that's the point of it. This is for
+        // every other way out: a throw, a cancellation, a stopped run. An aggregate device
+        // outlives the process that made it, and leaving one registered on the developer's
+        // Mac is not something a test gets to do. Destroying twice just returns an error.
+        defer { AudioHardwareDestroyAggregateDevice(aggregate) }
 
         let service = SpeechRecognitionService()
         let session = try await service.startRecognition(
