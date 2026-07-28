@@ -285,6 +285,37 @@ enum HistoryRetention: String, CaseIterable, Identifiable {
     }
 }
 
+/// How long a safety recording that couldn't be transcribed stays on disk.
+///
+/// The default is the only one most people should want: the recording exists to rescue
+/// one dictation, and once the next one has finished it has nothing left to protect.
+/// The longer settings are for chasing an intermittent microphone, where you need the
+/// evidence to survive the dictations you do after it.
+enum BackupRetention: String, CaseIterable, Identifiable {
+    case untilNextDictation, hour, day, week
+
+    var id: String { rawValue }
+
+    /// Nil means "no time-based retention" — swept as soon as the next dictation finishes.
+    var duration: TimeInterval? {
+        switch self {
+        case .untilNextDictation: return nil
+        case .hour: return 60 * 60
+        case .day: return 24 * 60 * 60
+        case .week: return 7 * 24 * 60 * 60
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .untilNextDictation: return String(localized: "Until the next dictation")
+        case .hour: return String(localized: "1 Hour")
+        case .day: return String(localized: "1 Day")
+        case .week: return String(localized: "1 Week")
+        }
+    }
+}
+
 enum Settings {
     static let hotkeyKey = "dictate_hotkey"
     static let localeKey = "dictate_localeId"
@@ -313,6 +344,8 @@ enum Settings {
     static let dictationHistoryRetentionKey = "dictate_dictationHistoryRetention"
     static let totalDictationsKey = "dictate_totalDictations"
     static let firstLaunchDateKey = "dictate_firstLaunchDate"
+    static let backupRecordingKey = "dictate_backupRecording"
+    static let backupRetentionKey = "dictate_backupRetention"
     static let spokenCommandsEnabledKey = "dictate_spokenCommandsEnabled"
     static let spokenCommandsPositionKey = "dictate_spokenCommandsPosition"
     /// Pre-cloud boolean toggle; read only to migrate into cleanupMode.
@@ -479,6 +512,19 @@ enum Settings {
     /// Learn corrections from how the user edits inserted text. Default on.
     static var learningEnabled: Bool {
         UserDefaults.standard.object(forKey: learningEnabledKey) as? Bool ?? true
+    }
+
+    /// Keep the dictation's audio on disk until it has produced text, so a session that
+    /// transcribes to nothing can be recovered instead of re-spoken. Default on: the file
+    /// is deleted as soon as the words land, and never leaves this Mac.
+    static var backupRecording: Bool {
+        UserDefaults.standard.object(forKey: backupRecordingKey) as? Bool ?? true
+    }
+
+    /// How long a recording that couldn't be transcribed is kept. Default: only until the
+    /// next dictation finishes, which keeps at most one file on disk.
+    static var backupRetention: BackupRetention {
+        BackupRetention(rawValue: UserDefaults.standard.string(forKey: backupRetentionKey) ?? "") ?? .untilNextDictation
     }
 
     /// Convert spoken formatting commands ("colon", "new line") into literals. Default on.

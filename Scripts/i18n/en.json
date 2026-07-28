@@ -149,7 +149,7 @@
     "Same, plus any custom instructions you give it. The transcript goes to %@; a typical dictation costs a fraction of a cent.": "Same, plus any custom instructions you give it. The transcript goes to %@; a typical dictation costs a fraction of a cent.",
     "Save": "Save",
     "Save conversation transcripts": "Save conversation transcripts",
-    "Saves a transcript to this Mac while you dictate, written to disk moments  after the words are spoken, with speakers told apart. It works best with  two or three voices.\n\nEach file ends with a record of the session: which microphone was used,  when it started and stopped, and how long it ran. Times are your local  time, with the UTC offset attached, so the day of the week is the one you  actually lived and the exact instant is still unambiguous.\n\nNo audio is ever stored, nothing is uploaded, and the speaker labels  appear only in the file — they never show up in the text Dictate pastes  for you. On by default; turn it off and nothing is written at all.": "Saves a transcript to this Mac while you dictate, written to disk moments  after the words are spoken, with speakers told apart. It works best with  two or three voices.\n\nEach file ends with a record of the session: which microphone was used,  when it started and stopped, and how long it ran. Times are your local  time, with the UTC offset attached, so the day of the week is the one you  actually lived and the exact instant is still unambiguous.\n\nNo audio is ever stored, nothing is uploaded, and the speaker labels  appear only in the file — they never show up in the text Dictate pastes  for you. On by default; turn it off and nothing is written at all.",
+    "Saves a transcript to this Mac while you dictate, written to disk moments  after the words are spoken, with speakers told apart. It works best with  two or three voices.\n\nEach file ends with a record of the session: which microphone was used,  when it started and stopped, and how long it ran. Times are your local  time, with the UTC offset attached, so the day of the week is the one you  actually lived and the exact instant is still unambiguous.\n\nThe transcript holds no audio, nothing is uploaded, and the speaker labels  appear only in the file — they never show up in the text Dictate pastes  for you. On by default; turn it off and nothing is written at all.": "Saves a transcript to this Mac while you dictate, written to disk moments  after the words are spoken, with speakers told apart. It works best with  two or three voices.\n\nEach file ends with a record of the session: which microphone was used,  when it started and stopped, and how long it ran. Times are your local  time, with the UTC offset attached, so the day of the week is the one you  actually lived and the exact instant is still unambiguous.\n\nThe transcript holds no audio, nothing is uploaded, and the speaker labels  appear only in the file — they never show up in the text Dictate pastes  for you. On by default; turn it off and nothing is written at all.",
     "Selected device unavailable (id %@)": "Selected device unavailable (id %@)",
     "Selected language isn't supported for on-device recognition": "Selected language isn't supported for on-device recognition",
     "Server URL": "Server URL",
@@ -288,7 +288,18 @@
     "Not granted": "Not granted",
     "Copy Diagnostic Info": "Copy Diagnostic Info",
     "Copied": "Copied",
-    "Open App Support Folder": "Open App Support Folder"
+    "Open App Support Folder": "Open App Support Folder",
+    "Microphone disconnected — dictation stopped": "Microphone disconnected — dictation stopped",
+    "Recovered audio": "Recovered audio",
+    "Keep a safety copy of the audio": "Keep a safety copy of the audio",
+    "Recovery": "Recovery",
+    "Open Recovery Folder": "Open Recovery Folder",
+    "While you dictate, Dictate also records the audio to a file on this Mac. If recognition comes back with nothing — the microphone was unplugged, the recognizer stalled — it transcribes that file instead, so what you said isn't lost. The recording is deleted the moment your words are inserted, and a recording kept because it couldn't be transcribed lasts only until your next dictation finishes. By default there is never more than one, and it never leaves this Mac.": "While you dictate, Dictate also records the audio to a file on this Mac. If recognition comes back with nothing — the microphone was unplugged, the recognizer stalled — it transcribes that file instead, so what you said isn't lost. The recording is deleted the moment your words are inserted, and a recording kept because it couldn't be transcribed lasts only until your next dictation finishes. By default there is never more than one, and it never leaves this Mac.",
+    "Advanced": "Advanced",
+    "Keep failed recordings for": "Keep failed recordings for",
+    "Until the next dictation": "Until the next dictation",
+    "1 Hour": "1 Hour",
+    "Only recordings Dictate couldn't transcribe are affected — one that produced text is always deleted immediately. Anything longer than the default keeps audio of your failed dictations on disk for that long, so raise it while you're tracking down a microphone problem and put it back afterwards.": "Only recordings Dictate couldn't transcribe are affected — one that produced text is always deleted immediately. Anything longer than the default keeps audio of your failed dictations on disk for that long, so raise it while you're tracking down a microphone problem and put it back afterwards."
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate listens to your voice to type what you say. Audio never leaves this Mac.",

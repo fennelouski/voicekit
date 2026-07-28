@@ -14,8 +14,10 @@ import VoiceKit
 struct InputPane: View {
     @AppStorage(Settings.localeKey) private var localeId = ""
 
-    /// The microphone doesn't live in `Settings` — VoiceKit owns that key.
-    @State private var selectedDeviceId = AudioInputSelection.loadSelectedDeviceId() ?? ""
+    /// The microphone doesn't live in `Settings` — VoiceKit owns that key. Stored by UID,
+    /// shown here as the device ID the picker tags with, so an unplugged mic reads as
+    /// "System default" instead of selecting whatever inherited its number.
+    @State private var selectedDeviceId = AudioInputSelection.selectedDeviceTag()
     @State private var locales: [Locale] = []
     @State private var devices: [SelectableDevice] = []
 

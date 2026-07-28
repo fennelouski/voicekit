@@ -35,13 +35,18 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     private var analyzerFormat: AVAudioFormat?
     private var bufferConverter: BufferConverter?
 
-    // Audio engine
-    private let audioEngine = AVAudioEngine()
-    private var isTapInstalled: Bool = false
+    // Audio engine. Built per session, and rebuildable within one — see `buildEngine`.
+    private var audioEngine: AVAudioEngine?
+    /// True from a successful start until `stopRecognition`. Distinct from `audioEngine != nil`,
+    /// which goes false while the microphone is down mid-session — exactly when the supervisor
+    /// most needs to be told something is wrong.
+    private var sessionActive = false
+    private var requestedDeviceID: UInt32?
+    private let heartbeat = CaptureHeartbeat()
+    private var backup: BackupRecorder?
 
     // Level stream for mic indicator
     private var levelContinuation: AsyncStream<Float>.Continuation?
-    private var levelBufferCount: Int = 0
 
     // Audio buffer forwarding (for camera recording mux)
     private var audioBufferContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
@@ -79,7 +84,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
     /// Stop the current transcription session.
     public func stopTranscription() async {
-        await stopRecognition()
+        _ = await stopRecognition()
     }
 
     // MARK: - Full recognition API
@@ -89,8 +94,15 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     /// - Parameters:
     ///   - locale: Optional locale for recognition (e.g. from Settings). Nil uses system default.
     ///   - inputDeviceID: On macOS only, optional Core Audio device ID to use as input. Nil uses system default.
+    ///   - backupDirectory: If set, the session's microphone audio is also written to a file
+    ///     here, so a transcription that comes back empty can be retried offline. The caller
+    ///     owns the file once `stopRecognition()` hands back its URL.
     /// - Throws: `RecognitionError.notAuthorized` if permission denied, `RecognitionError.localeNotSupported` if locale unavailable.
-    public func startRecognition(locale: Locale? = nil, inputDeviceID: UInt32? = nil) async throws -> RecognitionSession {
+    public func startRecognition(
+        locale: Locale? = nil,
+        inputDeviceID: UInt32? = nil,
+        backupDirectory: URL? = nil
+    ) async throws -> RecognitionSession {
         // Check authorization
         let status = Self.authorizationStatus()
         if status != .authorized {
@@ -176,7 +188,6 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         let levelStream = AsyncStream<Float> { continuation in
             self.levelContinuation = continuation
         }
-        levelBufferCount = 0
 
         // Set up audio buffer stream (for camera recording mux)
         let audioBufferStream = AsyncStream<AVAudioPCMBuffer> { continuation in
@@ -209,14 +220,89 @@ public actor SpeechRecognitionService: TranscriptionProvider {
             capturedTranscriptCont?.finish()
         }
 
-        // Set up audio engine and tap
-        let inputNode = audioEngine.inputNode
+        // Keep a copy of the audio on disk when the caller asked for one, so a session that
+        // transcribes to nothing can still be salvaged.
+        if let backupDirectory {
+            backup = BackupRecorder(directory: backupDirectory)
+        }
+
+        // Start capturing. Everything above this point is the analyzer, which outlives any
+        // single microphone — see `restartCapture`.
+        requestedDeviceID = inputDeviceID
+        do {
+            try startCapture(deviceID: inputDeviceID)
+            sessionActive = true
+        } catch {
+            _ = backup?.finish()
+            backup = nil
+            #if os(iOS) || os(visionOS)
+            try? AVAudioSession.sharedInstance().setActive(false)
+            #endif
+            throw error
+        }
+
+        return RecognitionSession(
+            transcript: transcriptStream, level: levelStream,
+            audioBuffers: audioBufferStream, backupURL: backup?.url
+        )
+    }
+
+    // MARK: - Capture
+
+    /// Seconds since the microphone last delivered a buffer. Buffers keep arriving through
+    /// silence, so a large value means the audio path is broken, not that nobody is talking.
+    /// Zero when there is no session, so an idle app never looks stalled.
+    public func silenceDuration() -> TimeInterval {
+        sessionActive ? heartbeat.silence : 0
+    }
+
+    /// Tear the microphone down and bring it back up, leaving the analyzer and everything
+    /// already transcribed untouched. This is the recovery for a device that disappeared
+    /// mid-sentence: the user keeps talking and only loses the moment it took to reconnect.
+    /// - Returns: false if there is no session to restart, or if the microphone didn't come back.
+    @discardableResult
+    public func restartCapture() -> Bool {
+        guard sessionActive else { return false }
+        teardownEngine()
+        do {
+            try startCapture(deviceID: requestedDeviceID)
+            Self.logger.notice("capture restarted")
+            return true
+        } catch {
+            Self.logger.error("capture restart failed: \(error, privacy: .public)")
+            return false
+        }
+    }
+
+    /// Build and start the microphone, falling back to the system default input if the
+    /// requested device won't open.
+    private func startCapture(deviceID: UInt32?) throws {
+        do {
+            try buildEngine(deviceID: deviceID)
+        } catch {
+            // A stored device ID is the usual suspect. Core Audio renumbers devices as
+            // hardware comes and goes, so yesterday's ID can name something else entirely
+            // today — or nothing. The default input is always real; take it over failing.
+            guard deviceID != nil else { throw error }
+            Self.logger.error("input device \(deviceID!) unusable (\(error, privacy: .public)) — falling back to the system default")
+            teardownEngine()
+            try buildEngine(deviceID: nil)
+        }
+    }
+
+    private func buildEngine(deviceID: UInt32?) throws {
+        // A fresh engine every time, never one held across sessions. AVAudioEngine caches
+        // the format of the input hardware it was attached to, and a long-lived instance
+        // goes on reporting the format of a microphone that has since been unplugged —
+        // which is precisely the disagreement that makes `installTap` raise.
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
 
         // Pin the selected input device BEFORE reading the format — a non-default mic can have a
         // different native sample rate/channel count, and the tap must match the device we'll
         // actually capture from. Throwing here is clean: no tap is installed yet.
         #if os(macOS)
-        if let deviceID = inputDeviceID, let audioUnit = inputNode.audioUnit {
+        if let deviceID, let audioUnit = inputNode.audioUnit {
             var id = deviceID
             let err = AudioUnitSetProperty(
                 audioUnit,
@@ -234,9 +320,8 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        // installTap throws an uncatchable ObjC exception (SIGABRT) if the format is invalid —
-        // channelCount 0 (mic not ready / no input device) passes a sampleRate-only check, so
-        // guard both.
+        // channelCount 0 (mic not ready / no input device) passes a sampleRate-only check,
+        // so guard both before handing the format to AVFoundation.
         guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
             throw RecognitionError.engineStartFailed(NSError(
                 domain: "SpeechRecognitionService",
@@ -248,59 +333,74 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         // Capture references for the tap callback
         let levelCont = levelContinuation
         let audioBufferCont = audioBufferContinuation
+        let inputBuilder = inputContinuation
         let converter = bufferConverter
         let targetFormat = analyzerFormat
+        let heartbeat = self.heartbeat
+        let backup = self.backup
+        // Boxed in the closure rather than kept on the actor: the tap runs off-actor, and
+        // one counter per engine is exactly the lifetime we want anyway.
+        var levelBufferCount = 0
 
-        // installTap throws "Only one tap can be installed" if one survived a prior session that
-        // didn't clean up (interrupted stop, error between install and removeTap). removeTap is a
-        // no-op when none exists, so this is a safe idempotent reset before installing ours.
-        inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { buffer, _ in
+        let tap: AVAudioNodeTapBlock = { buffer, _ in
+            heartbeat.beat()
+
             // Feed converted audio to the analyzer
             if let targetFormat, let converter {
                 do {
                     let converted = try converter.convertBuffer(buffer, to: targetFormat)
-                    inputBuilder.yield(AnalyzerInput(buffer: converted))
+                    inputBuilder?.yield(AnalyzerInput(buffer: converted))
                 } catch {
                     Self.logger.error("buffer conversion error: \(error)")
                 }
             }
 
+            backup?.write(buffer)
+
             // Forward raw audio buffer for camera recording
             audioBufferCont?.yield(buffer)
 
             // Compute RMS level for mic indicator (throttled)
-            self.levelBufferCount += 1
-            if self.levelBufferCount % 2 == 0, let level = RMSCalculator.rmsLevel(from: buffer, scalingFactor: 10) {
+            levelBufferCount += 1
+            if levelBufferCount % 2 == 0, let level = RMSCalculator.rmsLevel(from: buffer, scalingFactor: 10) {
                 levelCont?.yield(level)
             }
         }
-        isTapInstalled = true
 
         do {
-            try audioEngine.start()
+            try inputNode.installTapSafely(onBus: 0, bufferSize: 4096, format: recordingFormat, block: tap)
         } catch {
-            if isTapInstalled {
-                inputNode.removeTap(onBus: 0)
-                isTapInstalled = false
-            }
-            #if os(iOS) || os(visionOS)
-            try? AVAudioSession.sharedInstance().setActive(false)
-            #endif
             throw RecognitionError.engineStartFailed(error)
         }
 
-        return RecognitionSession(transcript: transcriptStream, level: levelStream, audioBuffers: audioBufferStream)
+        do {
+            try engine.start()
+        } catch {
+            inputNode.removeTapSafely(onBus: 0)
+            throw RecognitionError.engineStartFailed(error)
+        }
+
+        audioEngine = engine
+        heartbeat.reset()
+    }
+
+    private func teardownEngine() {
+        guard let engine = audioEngine else { return }
+        audioEngine = nil
+        engine.stop()
+        // Removing a tap from a node whose hardware has gone away is itself a raise risk.
+        engine.inputNode.removeTapSafely(onBus: 0)
     }
 
     /// Stop recognition and release resources. Call when session ends.
-    public func stopRecognition() async {
-        // Stop audio engine and remove tap
-        audioEngine.stop()
-        if isTapInstalled {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            isTapInstalled = false
-        }
+    /// - Returns: the backup recording's URL, if one was requested and captured enough audio
+    ///   to be worth transcribing. The caller owns it, including deleting it.
+    @discardableResult
+    public func stopRecognition() async -> URL? {
+        sessionActive = false
+        teardownEngine()
+        let backupURL = backup?.finish()
+        backup = nil
 
         // Finish the input stream to signal end of audio
         inputContinuation?.finish()
@@ -341,6 +441,8 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         analyzer = nil
         analyzerFormat = nil
         bufferConverter = nil
-        levelBufferCount = 0
+        requestedDeviceID = nil
+
+        return backupURL
     }
 }

@@ -21,6 +21,14 @@ Dictate is made by Nathan Fennel. Contact: nathan@100apps.studio.
 - **Microphone audio.** Captured only while you are actively dictating (holding the hotkey, or
   after a tap that locks dictation on). Speech is transcribed on-device using Apple's
   SpeechTranscriber and SpeechAnalyzer. Dictate never sends your audio off the device.
+- **Safety copy of the audio.** While you are dictating, Dictate also writes the audio to a file in
+  your Application Support folder. It exists so that a dictation which fails to transcribe — an
+  unplugged microphone, a stalled recognizer — can be transcribed from the recording instead of
+  lost. The file is deleted as soon as your text is inserted. A recording kept because it could
+  not be transcribed is deleted when your next dictation finishes, so by default there is never
+  more than one on disk; an advanced setting can extend that to an hour, a day, or a week for
+  diagnosing a faulty microphone. It is never uploaded. Turn it off, or change how long recordings
+  are kept, under Settings → Privacy → Recovery.
 - **Transcribed text.** Inserted into the app that has focus, using the macOS Accessibility and
   clipboard features.
 - **Dictation history.** The last hour of dictations is kept in memory so you can recall it with

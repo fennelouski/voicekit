@@ -38,6 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // First, so a crash anywhere after this point still brings the app back.
+        CrashRelaunch.install()
+
         // Touch it now so "first used" in About reflects the real first launch,
         // not whenever someone happens to open the panel for the first time.
         _ = Settings.firstLaunchDate

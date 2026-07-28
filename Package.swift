@@ -26,8 +26,11 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
+        // Exists solely so Swift can catch the ObjC exceptions AVAudioEngine raises.
+        .target(name: "VKObjC"),
         .target(
             name: "VoiceKit",
+            dependencies: ["VKObjC"],
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ]

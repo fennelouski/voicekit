@@ -93,8 +93,24 @@ public enum AudioInputSelection {
     }
 
     /// Save the current device/input selection.
+    ///
+    /// On macOS the device is stored by its UID, not by the `AudioDeviceID` in
+    /// `SelectableDevice.id`. Core Audio hands out those numbers on the fly and reuses
+    /// them: connect a pair of AirPods, disconnect them, and the number you saved for
+    /// your desk mic can now belong to something else entirely — at which point the app
+    /// opens the wrong device, or a device whose audio format nothing expects. The UID
+    /// survives unplugging, reconnecting, and rebooting.
+    ///
+    /// A macOS device with no UID at all is therefore not saved: the selection falls back to
+    /// the system default rather than being written down as a number. A default microphone is
+    /// wrong in a way the user can see and correct; a number that later names different
+    /// hardware records the wrong device while still looking like the right one.
     public static func saveSelection(device: SelectableDevice?, input: SelectableInput?, storage: AudioInputStorage = UserDefaultsAudioInputStorage()) {
-        storage.set(device?.id, forKey: StorageKeys.deviceId)
+        var stored = device?.id
+        #if os(macOS)
+        stored = device.flatMap { AudioDeviceID($0.id) }.flatMap { deviceUID(for: $0) }
+        #endif
+        storage.set(stored, forKey: StorageKeys.deviceId)
         storage.set(input?.id, forKey: StorageKeys.inputId)
     }
 
@@ -162,6 +178,34 @@ public enum AudioInputSelection {
     #endif
 
     #if os(macOS)
+    /// The saved microphone, resolved to a device ID that is valid *right now*.
+    ///
+    /// Returns nil for "system default" and for a saved device that isn't currently
+    /// connected — in both cases the caller should let the system pick, which is what a
+    /// user with their headphones in a drawer expects anyway.
+    ///
+    /// Selections saved before Dictate stored UIDs are a bare `AudioDeviceID`. Those are
+    /// honoured only if that number still names a connected input, and are rewritten to
+    /// the device's UID on the way past so they stop drifting.
+    public static func resolveSelectedDeviceID(storage: AudioInputStorage = UserDefaultsAudioInputStorage()) -> AudioDeviceID? {
+        guard let saved = storage.string(forKey: StorageKeys.deviceId), !saved.isEmpty else { return nil }
+        if let resolved = deviceID(forUID: saved) { return resolved }
+
+        // Legacy numeric selection: trust it only if it's still a real input device.
+        guard let legacy = AudioDeviceID(saved),
+              availableDevicesMacOS().contains(where: { $0.id == saved }) else { return nil }
+        if let uid = deviceUID(for: legacy) {
+            storage.set(uid, forKey: StorageKeys.deviceId)
+        }
+        return legacy
+    }
+
+    /// The saved microphone as a `SelectableDevice.id`, for driving a picker whose tags are
+    /// device IDs. Empty string means "system default", including when the saved device is gone.
+    public static func selectedDeviceTag(storage: AudioInputStorage = UserDefaultsAudioInputStorage()) -> String {
+        resolveSelectedDeviceID(storage: storage).map(String.init) ?? ""
+    }
+
     /// The device's persistent UID (`kAudioDevicePropertyDeviceUID`). Unlike the numeric
     /// `AudioDeviceID`, the UID is stable across reboots and unplugs — use it for storage.
     public static func deviceUID(for deviceId: AudioDeviceID) -> String? {

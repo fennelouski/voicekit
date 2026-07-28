@@ -23,6 +23,9 @@ enum LearningPaths {
     static var corrections: URL { directory.appendingPathComponent("corrections.json") }
     static var log: URL { directory.appendingPathComponent("learning-log.jsonl") }
     static var transcripts: URL { directory.appendingPathComponent("Transcripts", isDirectory: true) }
+    /// Scratch space for the in-flight dictation's audio. Files here are deleted as soon as
+    /// the dictation produces text; anything that outlives its session is pruned within a day.
+    static var recovery: URL { directory.appendingPathComponent("Recovery", isDirectory: true) }
     static var history: URL { directory.appendingPathComponent("history.json") }
 }
 

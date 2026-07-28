@@ -196,12 +196,21 @@ final class ConversationSessionController {
         let setAnchor: @Sendable @MainActor (Date) -> Void = { capture.anchor = $0 }
         let writer = Task.detached {
             var file: AVAudioFile?
+            // The tap's format is whatever the HAL declared, and `settings` doesn't carry
+            // interleaving — so a stereo mixdown tap hands AVAudioFile a layout its
+            // `processingFormat` doesn't expect, which is a *trap*, not an exception. Same
+            // conversion MicRecorder does below, for the same reason.
+            var fileFormat: AVAudioFormat?
+            let converter = BufferConverter()
             for await buffer in buffers {
                 if file == nil {
                     file = try? AVAudioFile(forWriting: url, settings: buffer.format.settings)
+                    fileFormat = file?.processingFormat
                     await setAnchor(Date())
                 }
-                try? file?.write(from: buffer)
+                guard let file, let fileFormat,
+                      let converted = try? converter.convertBuffer(buffer, to: fileFormat) else { continue }
+                try? catchingObjCException { try? file.write(from: converted) }
             }
         }
         await writer.value
@@ -267,9 +276,15 @@ private final class MicRecorder {
         }
 
         let file = try AVAudioFile(forWriting: url, settings: format.settings)
-        inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
-            try? file.write(from: buffer)
+        // The tap may end up delivering a different format than the one we asked for (see
+        // `installTapSafely`), and a buffer AVAudioFile didn't expect is a *trap* — not an
+        // exception, so nothing can catch it. Converting to the file's own `processingFormat`
+        // (which is not the format it encodes to) is the only thing that makes this safe.
+        let fileFormat = file.processingFormat
+        let converter = BufferConverter()
+        try inputNode.installTapSafely(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
+            guard let converted = try? converter.convertBuffer(buffer, to: fileFormat) else { return }
+            try? catchingObjCException { try? file.write(from: converted) }
         }
         tapInstalled = true
         try engine.start()
@@ -278,7 +293,7 @@ private final class MicRecorder {
     func stop() {
         engine.stop()
         if tapInstalled {
-            engine.inputNode.removeTap(onBus: 0)
+            engine.inputNode.removeTapSafely(onBus: 0)
             tapInstalled = false
         }
     }

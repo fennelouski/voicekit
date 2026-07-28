@@ -58,11 +58,19 @@ public actor MicLevelService {
         levelBufferCount = 0
         let levelCont = levelContinuation
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [self] buffer, _ in
-            levelBufferCount += 1
-            if levelBufferCount % 2 == 0, let level = RMSCalculator.rmsLevel(from: buffer, scalingFactor: 4) {
-                levelCont?.yield(level)
+        do {
+            try inputNode.installTapSafely(onBus: 0, bufferSize: 1024, format: recordingFormat) { [self] buffer, _ in
+                levelBufferCount += 1
+                if levelBufferCount % 2 == 0, let level = RMSCalculator.rmsLevel(from: buffer, scalingFactor: 4) {
+                    levelCont?.yield(level)
+                }
             }
+        } catch {
+            // A level meter is never worth crashing the app over.
+            audioEngine.stop()
+            levelContinuation?.finish()
+            levelContinuation = nil
+            throw Error.engineStartFailed(error)
         }
         isTapInstalled = true
 
@@ -76,7 +84,7 @@ public actor MicLevelService {
         audioEngine.stop()
 
         if isTapInstalled {
-            audioEngine.inputNode.removeTap(onBus: 0)
+            audioEngine.inputNode.removeTapSafely(onBus: 0)
             isTapInstalled = false
         }
 

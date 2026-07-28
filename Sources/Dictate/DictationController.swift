@@ -28,6 +28,15 @@ final class DictationController {
 
     private var recorder: ConversationRecorder?
     private var audioTask: Task<Void, Never>?
+    private var watchdogTask: Task<Void, Never>?
+    /// The safety recording currently being written. Cleanup of an *earlier* dictation can
+    /// finish while this one is still recording, so the sweep has to know to spare it.
+    private var activeBackupURL: URL?
+
+    /// How long the microphone may go without delivering a buffer before we assume the
+    /// audio path is dead rather than the room quiet. Buffers arrive every ~90ms at the
+    /// sizes we ask for, so this is generous by two orders of magnitude.
+    private let captureStallThreshold: TimeInterval = 2.5
 
     private var isStarting = false
     private var isListening = false
@@ -61,7 +70,7 @@ final class DictationController {
             ignoreNextKeyUp = false
             return
         }
-        guard isListening || isStarting else { return }
+        guard isListening || isStarting, !isStopping else { return }
         let held = Date().timeIntervalSince(pressStart ?? .distantPast)
         if held < tapThreshold {
             locked = true
@@ -88,14 +97,23 @@ final class DictationController {
     private func start() {
         correctionObserver.harvest()
         isStarting = true
+        // A stop requested while a *previous* start was still running, and never consumed
+        // because that start threw, would otherwise kill this session the instant it opens.
+        pendingStop = false
         accumulator.reset()
         hud.show()
         onListeningChange?(true)
 
         Task {
             do {
-                let deviceID = AudioInputSelection.loadSelectedDeviceId().flatMap { UInt32($0) }
-                let session = try await service.startRecognition(locale: Settings.locale, inputDeviceID: deviceID)
+                // Resolved, not read raw: the saved microphone may have been renumbered or
+                // unplugged since it was chosen, and a stale ID is how this used to die.
+                let deviceID = AudioInputSelection.resolveSelectedDeviceID()
+                let backupDirectory: URL? = Settings.backupRecording ? LearningPaths.recovery : nil
+                let session = try await service.startRecognition(
+                    locale: Settings.locale, inputDeviceID: deviceID, backupDirectory: backupDirectory
+                )
+                activeBackupURL = session.backupURL
 
                 if Settings.conversationTranscripts {
                     let rec = ConversationRecorder()
@@ -125,6 +143,7 @@ final class DictationController {
 
                 isStarting = false
                 isListening = true
+                startWatchdog()
                 if pendingStop {
                     pendingStop = false
                     requestStop()
@@ -138,6 +157,49 @@ final class DictationController {
         }
     }
 
+    // MARK: - Watchdog
+
+    /// Watches for the microphone going quiet in the way that means "gone", not "nobody is
+    /// speaking", and puts it back.
+    ///
+    /// This is the failure the app used to have no answer for: unplug a pair of AirPods
+    /// mid-sentence and capture stops, but the session looks perfectly healthy — the HUD
+    /// still says it's listening, so you keep talking and find out at the end that none of
+    /// it was heard. Restarting the microphone alone, rather than the whole session, keeps
+    /// everything already transcribed and costs the user only the second it takes to swap.
+    private func startWatchdog() {
+        watchdogTask?.cancel()
+        watchdogTask = Task { [weak self] in
+            var failures = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, self.isListening, !self.isStopping else { return }
+                guard await self.service.silenceDuration() > self.captureStallThreshold else {
+                    failures = 0
+                    continue
+                }
+
+                Self.log.error("microphone stalled — restarting capture")
+                if await self.service.restartCapture() {
+                    failures = 0
+                    continue
+                }
+
+                // Three failed reconnections in a row is a microphone that isn't coming
+                // back. Stop rather than leave a HUD claiming to listen: stopping still
+                // inserts what was heard, and still recovers from the backup audio.
+                failures += 1
+                guard failures >= 3 else { continue }
+                Self.log.error("microphone did not come back — ending the session")
+                // Stopping puts the HUD into its processing state, so the message has to
+                // wait for the insert to finish or it would flash past unread.
+                self.pendingHUDError = String(localized: "Microphone disconnected — dictation stopped")
+                self.requestStop()
+                return
+            }
+        }
+    }
+
     private func requestStop() {
         if isStarting {
             pendingStop = true
@@ -146,9 +208,14 @@ final class DictationController {
         guard isListening, !isStopping else { return }
         isStopping = true
         hud.setProcessing()
+        watchdogTask?.cancel()
+        watchdogTask = nil
 
         Task {
-            await service.stopRecognition()
+            let backupURL = await service.stopRecognition()
+            // Safe to clear here and nowhere later: `isStopping` is still true, so no new
+            // session can have started and claimed this slot.
+            activeBackupURL = nil
             await transcriptTask?.value
             levelTask?.cancel()
             // Settle the transcript file in the background. Diarization (which may be
@@ -176,7 +243,7 @@ final class DictationController {
             locked = false
             onListeningChange?(false)
 
-            enqueueCleanup(raw: raw, hints: hints, chain: chain)
+            enqueueCleanup(raw: raw, hints: hints, chain: chain, backup: backupURL)
         }
     }
 
@@ -189,17 +256,51 @@ final class DictationController {
     // only when nothing is being recorded, hands the HUD back.
     private var cleanupTail: Task<Void, Never> = Task {}
     private var pendingCleanups = 0
+    /// Something went wrong during recording that the user should see, held back until the
+    /// text has been inserted so it isn't overwritten by the processing state.
+    private var pendingHUDError: String?
 
-    private func enqueueCleanup(raw: String, hints: [Correction], chain: [CleanupMode]) {
+    private func enqueueCleanup(raw: String, hints: [Correction], chain: [CleanupMode], backup: URL?) {
         pendingCleanups += 1
         let previous = cleanupTail
         cleanupTail = Task { [weak self] in
             await previous.value
             guard let self else { return }
-            let failed = await self.runCleanup(raw: raw, hints: hints, chain: chain)
+
+            // Live recognition came back with nothing, but the microphone was recording the
+            // whole time. Transcribe what it caught rather than telling the user their last
+            // minute of talking is gone.
+            var raw = raw
+            var recovered = false
+            if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let backup {
+                if let text = await Self.recoverTranscript(from: backup) {
+                    raw = text
+                    recovered = true
+                    Self.log.notice("recovered \(text.count, privacy: .public) chars from the backup recording")
+                }
+            }
+
+            let failed = await self.runCleanup(raw: raw, hints: hints, chain: chain, recovered: recovered)
+
+            // This dictation's audio existed to protect these words: if they landed, it can
+            // go now; if they didn't, it survives — by default only until the next dictation
+            // finishes, which is the only window in which it's any use to anyone.
+            var keep: [URL] = []
+            if let backup, raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                keep.append(backup)
+            }
+            if let recording = self.activeBackupURL {
+                keep.append(recording)
+            }
+            BackupRecorder.sweep(
+                LearningPaths.recovery, keeping: keep, retention: Settings.backupRetention.duration
+            )
             self.pendingCleanups -= 1
             guard self.pendingCleanups == 0, !self.isListening, !self.isStarting else { return }
-            if failed {
+            if let message = self.pendingHUDError {
+                self.pendingHUDError = nil
+                self.hud.showError(message)
+            } else if failed {
                 self.hud.showError(String(localized: "Cleanup failed — inserted as-is"))
             } else {
                 self.hud.hide()
@@ -212,9 +313,10 @@ final class DictationController {
     /// Every version the text passes through is kept as a history stage — raw, filler removed,
     /// learned corrections, and the AI polish (plus any providers that failed) — so a rewrite
     /// that went too far can be seen and recovered from Recent Dictations.
-    private func runCleanup(raw: String, hints: [Correction], chain: [CleanupMode]) async -> Bool {
+    private func runCleanup(raw: String, hints: [Correction], chain: [CleanupMode], recovered: Bool) async -> Bool {
         var stages: [DictationHistory.Stage] = [
-            .init(label: String(localized: "Raw"), systemImage: "waveform", text: raw,
+            .init(label: recovered ? String(localized: "Recovered audio") : String(localized: "Raw"),
+                  systemImage: recovered ? "arrow.clockwise" : "waveform", text: raw,
                   status: .applied, changePercent: nil)
         ]
         var previous = raw
@@ -286,12 +388,28 @@ final class DictationController {
         return cleanupFallback
     }
 
+    /// Transcribe the session's backup recording after the fact, for when live recognition
+    /// produced nothing. Same on-device model, no network, just without the pressure of
+    /// keeping up — which is why it can succeed where the live pass didn't.
+    private static func recoverTranscript(from url: URL) async -> String? {
+        do {
+            let segments = try await FileTranscriber.transcribe(fileAt: url, locale: Settings.locale)
+            let text = segments.map(\.text).joined(separator: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : text
+        } catch {
+            log.error("backup transcription failed: \(error, privacy: .public)")
+            return nil
+        }
+    }
+
     /// Name the hardware, not the setting: "System default" tells you nothing six months
     /// later when you're trying to work out why one transcript sounds worse than another.
     private static func microphoneDescription() async -> String {
         let devices = await AudioInputSelection.availableDevices()
         if let selected = AudioInputSelection.loadSelectedDeviceId(), !selected.isEmpty {
-            if let device = devices.first(where: { $0.id == selected }) {
+            let tag = AudioInputSelection.selectedDeviceTag()
+            if let device = devices.first(where: { $0.id == tag }) {
                 return device.name
             }
             return String(format: String(localized: "Selected device unavailable (id %@)"), selected)

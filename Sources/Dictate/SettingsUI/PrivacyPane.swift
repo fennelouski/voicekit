@@ -17,6 +17,8 @@ struct PrivacyPane: View {
 
     @AppStorage(Settings.learningEnabledKey) private var learningEnabled = true
     @AppStorage(Settings.conversationTranscriptsKey) private var conversationTranscripts = true
+    @AppStorage(Settings.backupRecordingKey) private var backupRecording = true
+    @AppStorage(Settings.backupRetentionKey) private var backupRetentionRaw = BackupRetention.untilNextDictation.rawValue
     @AppStorage(Settings.dictationHistoryEnabledKey) private var dictationHistoryEnabled = true
     @AppStorage(Settings.dictationHistoryRetentionKey) private var retentionRaw = HistoryRetention.month.rawValue
 
@@ -106,7 +108,7 @@ struct PrivacyPane: View {
                         time, with the UTC offset attached, so the day of the week is the one you \
                         actually lived and the exact instant is still unambiguous.
 
-                        No audio is ever stored, nothing is uploaded, and the speaker labels \
+                        The transcript holds no audio, nothing is uploaded, and the speaker labels \
                         appear only in the file — they never show up in the text Dictate pastes \
                         for you. On by default; turn it off and nothing is written at all.
                         """),
@@ -124,6 +126,50 @@ struct PrivacyPane: View {
                 }
             } header: {
                 SettingsLabel(String(localized: "Transcripts"), systemImage: "doc.text", tint: SettingsTint.privacy)
+            }
+
+            Section {
+                Toggle("Keep a safety copy of the audio", isOn: $backupRecording)
+                    // Turning it off means "stop keeping my audio", not "stop keeping it from
+                    // now on" — the recording already on disk goes with the setting, rather
+                    // than waiting out a retention window for a feature that's off.
+                    .onChange(of: backupRecording) { _, on in
+                        guard !on else { return }
+                        BackupRecorder.sweep(LearningPaths.recovery, keeping: [])
+                    }
+
+                Text("While you dictate, Dictate also records the audio to a file on this Mac. If recognition comes back with nothing — the microphone was unplugged, the recognizer stalled — it transcribes that file instead, so what you said isn't lost. The recording is deleted the moment your words are inserted, and a recording kept because it couldn't be transcribed lasts only until your next dictation finishes. By default there is never more than one, and it never leaves this Mac.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if backupRecording {
+                    // Folded away: the default is right for everyone who isn't actively
+                    // chasing a flaky microphone, and a longer setting trades disk and
+                    // privacy for evidence.
+                    DisclosureGroup("Advanced") {
+                        Picker(
+                            "Keep failed recordings for",
+                            selection: $backupRetentionRaw.asEnum(BackupRetention.untilNextDictation)
+                        ) {
+                            ForEach(BackupRetention.allCases) { retention in
+                                Text(retention.displayName).tag(retention)
+                            }
+                        }
+
+                        Text("Only recordings Dictate couldn't transcribe are affected — one that produced text is always deleted immediately. Anything longer than the default keeps audio of your failed dictations on disk for that long, so raise it while you're tracking down a microphone problem and put it back afterwards.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Open Recovery Folder") {
+                        try? FileManager.default.createDirectory(
+                            at: LearningPaths.recovery, withIntermediateDirectories: true
+                        )
+                        NSWorkspace.shared.open(LearningPaths.recovery)
+                    }
+                }
+            } header: {
+                SettingsLabel(String(localized: "Recovery"), systemImage: "arrow.clockwise", tint: SettingsTint.privacy)
             }
 
             Section {
