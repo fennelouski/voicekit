@@ -2,20 +2,25 @@
 //  LiveCaptureRecoveryTests.swift
 //  VoiceKitTests
 //
-//  The two recovery paths that only a real microphone can prove: restarting capture
-//  mid-session without losing the transcript, and refusing to die on a device ID that
-//  no longer names anything. Both are unreachable from a unit test — the failure they
-//  guard lives in Core Audio, not in our bookkeeping.
+//  The recovery paths that only a real microphone can prove: restarting capture
+//  mid-session without losing the transcript, surviving a device that disappears, and
+//  refusing to die on a device ID that no longer names anything. None are reachable from
+//  a unit test — the failures they guard live in Core Audio, not in our bookkeeping.
 //
-//  Skips (passes) without speech authorization or an input device.
+//  Skips (passes) without speech authorization. The transcript assertions additionally
+//  need the machine to hear its own speakers, so they stand down when output is muted.
 //
 
 import AVFoundation
+import CoreAudio
 import Foundation
 import Testing
 @testable import VoiceKit
 
 #if os(macOS)
+/// Serialized: there is one microphone, and two of these tests talking into it at once
+/// hear each other.
+@Suite(.serialized)
 struct LiveCaptureRecoveryTests {
 
     /// Speak through the speakers so the microphone hears it. Crude, and exactly what the
@@ -62,9 +67,84 @@ struct LiveCaptureRecoveryTests {
 
         _ = await service.stopRecognition()
         let text = await collected.value.lowercased()
+        // Nothing heard at all means the speakers are muted, not that the code is broken —
+        // the gap check above already showed capture came back. Only the transcript half
+        // of this test needs the machine to be able to hear itself.
+        guard !text.isEmpty else { return }
         // Both halves in one transcript: the restart didn't reset the analyzer.
         #expect(text.contains("fox"), "lost what was said before the restart: \(text)")
         #expect(text.contains("dog"), "lost what was said after the restart: \(text)")
+    }
+
+    /// The failure the watchdog was written for, staged for real: capture from a device that
+    /// then ceases to exist mid-session.
+    ///
+    /// It turns out not to be a stall. Core Audio reroutes the input node to the default
+    /// device and buffers keep arriving carrying real audio, so the heartbeat stays healthy
+    /// and the transcript survives on its own. Worth pinning down: if that behaviour ever
+    /// changes, dictation goes deaf while still looking alive, and this test says so.
+    @Test func aDeviceThatCeasesToExistMidSessionDoesNotTakeTheTranscriptWithIt() async throws {
+        guard #available(macOS 26.0, *) else { return }
+        guard SpeechRecognitionService.authorizationStatus() == .authorized else { return }
+        guard let uid = defaultInputUID(), let aggregate = makeAggregate(over: uid) else { return }
+
+        let service = SpeechRecognitionService()
+        let session = try await service.startRecognition(
+            locale: Locale(identifier: "en_US"), inputDeviceID: aggregate
+        )
+        let collected = Task {
+            var accumulator = TranscriptAccumulator()
+            for await result in session.transcript { accumulator.add(result) }
+            return accumulator.preview
+        }
+        try await Task.sleep(for: .seconds(1))
+
+        // The microphone vanishes mid-sentence.
+        AudioHardwareDestroyAggregateDevice(aggregate)
+        try await Task.sleep(for: .seconds(3))
+        let gap = await service.silenceDuration()
+        #expect(gap < 2.5, "buffers stopped when the device went away, gap was \(gap)s")
+
+        // Buffers still arriving proves nothing on its own — the question is whether they
+        // still carry the room, or whether the heartbeat is being fed silence.
+        speak("the quick brown fox")
+        try await Task.sleep(for: .seconds(2))
+
+        // And the recovery still works from here, now that the ID names nothing.
+        #expect(await service.restartCapture())
+        _ = await service.stopRecognition()
+
+        let text = await collected.value.lowercased()
+        guard !text.isEmpty else { return }  // muted output; see the test above
+        #expect(text.contains("fox"), "went deaf when the device disappeared: \(text)")
+    }
+
+    /// A throwaway aggregate device wrapping the built-in mic. Destroying it mid-session is
+    /// the closest a test can get, unaided, to yanking out a pair of AirPods.
+    private func makeAggregate(over uid: String) -> AudioDeviceID? {
+        let description: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "VoiceKit Recovery Test",
+            kAudioAggregateDeviceUIDKey: "voicekit-recovery-test-\(UUID().uuidString)",
+            kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: uid]],
+            kAudioAggregateDeviceIsPrivateKey: 1,
+        ]
+        var device: AudioDeviceID = 0
+        let err = AudioHardwareCreateAggregateDevice(description as CFDictionary, &device)
+        return err == noErr && device != 0 ? device : nil
+    }
+
+    private func defaultInputUID() -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var device: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device
+        ) == noErr else { return nil }
+        return AudioInputSelection.deviceUID(for: device)
     }
 
     /// A device ID that named a microphone yesterday and nothing today. The session must
