@@ -33,6 +33,47 @@ struct LiveCaptureRecoveryTests {
         say.waitUntilExit()
     }
 
+    /// The transcript so far, readable while the session is still running — which is what
+    /// makes a heard-it-or-not check possible before the interesting part begins.
+    private actor Live {
+        private var accumulator = TranscriptAccumulator()
+
+        func add(_ result: TranscriptionResult) { accumulator.add(result) }
+
+        /// Folded the way the app folds it: a result's text covers the current utterance
+        /// only, and a restart ends one, so reading the last result alone would show the
+        /// first half missing when it is merely committed.
+        var text: String { accumulator.preview.lowercased() }
+
+        func heard(_ word: String) -> Bool { text.contains(word) }
+
+        func collect(_ transcript: AsyncStream<TranscriptionResult>) -> Task<Void, Never> {
+            Task { for await result in transcript { await self.add(result) } }
+        }
+    }
+
+    /// Say something and report whether the machine heard itself say it.
+    ///
+    /// Every assertion here rests on a loopback through the speakers, and that loopback is
+    /// not something a test can insist on: output may be muted, the volume low, the room
+    /// loud, or someone talking nearby — during one run this test transcribed a conversation
+    /// happening next to the laptop. All of those are the environment failing to cooperate,
+    /// not the code being wrong, and a test that reports them as bugs gets ignored, which
+    /// costs more than the coverage is worth. So they skip.
+    private func canHearItself(_ live: Live, saying phrase: String, listeningFor word: String) async -> Bool {
+        speak(phrase)
+        // Recognition trails the audio; give it a moment before deciding nothing arrived.
+        for _ in 0..<8 {
+            if await live.heard(word) { return true }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        // Said out loud, because a silent skip is indistinguishable from a test that ran —
+        // which is how this file came to be green while proving nothing.
+        print("[LiveCaptureRecovery] skipped: said \"\(phrase)\" and heard nothing back. "
+              + "Unmute output and turn the volume up to run these for real.")
+        return false
+    }
+
     /// The watchdog's whole job, minus the timer: tear the microphone down mid-sentence and
     /// bring it back, and the words from before the break must still be there afterwards.
     @Test func captureRestartsMidSessionAndTheTranscriptCarriesOn() async throws {
@@ -41,17 +82,17 @@ struct LiveCaptureRecoveryTests {
         let service = SpeechRecognitionService()
         let session = try await service.startRecognition(locale: Locale(identifier: "en_US"))
 
-        // Folded the way the app folds it: a result's text covers the current utterance
-        // only, and the restart ends one, so reading the last result alone would show the
-        // first half missing when it is merely committed.
-        let collected = Task {
-            var accumulator = TranscriptAccumulator()
-            for await result in session.transcript { accumulator.add(result) }
-            return accumulator.preview
-        }
+        let live = Live()
+        let collecting = await live.collect(session.transcript)
+        defer { collecting.cancel() }
 
-        speak("the quick brown fox")
-        try await Task.sleep(for: .seconds(1))
+        // The first half of the test doubles as the check that this machine can hear itself:
+        // if "fox" doesn't come back now, nothing measured after the restart would mean
+        // anything either, so there is no test to run.
+        guard await canHearItself(live, saying: "the quick brown fox", listeningFor: "fox") else {
+            _ = await service.stopRecognition()
+            return
+        }
 
         // Everything the watchdog does once it decides the microphone is gone.
         let restarted = await service.restartCapture()
@@ -63,15 +104,13 @@ struct LiveCaptureRecoveryTests {
         #expect(gap < 1, "the microphone should be feeding us again, gap was \(gap)s")
 
         speak("jumps over the lazy dog")
-        try await Task.sleep(for: .seconds(1))
+        try await Task.sleep(for: .seconds(2))
 
         _ = await service.stopRecognition()
-        let text = await collected.value.lowercased()
-        // Nothing heard at all means the speakers are muted, not that the code is broken —
-        // the gap check above already showed capture came back. Only the transcript half
-        // of this test needs the machine to be able to hear itself.
-        guard !text.isEmpty else { return }
-        // Both halves in one transcript: the restart didn't reset the analyzer.
+        let text = await live.text
+        // Both halves in one transcript: the restart didn't reset the analyzer. "fox" is
+        // known to have arrived before the restart, so its absence now is the analyzer
+        // having been torn down with the microphone — the exact regression this guards.
         #expect(text.contains("fox"), "lost what was said before the restart: \(text)")
         #expect(text.contains("dog"), "lost what was said after the restart: \(text)")
     }
@@ -97,12 +136,17 @@ struct LiveCaptureRecoveryTests {
         let session = try await service.startRecognition(
             locale: Locale(identifier: "en_US"), inputDeviceID: aggregate
         )
-        let collected = Task {
-            var accumulator = TranscriptAccumulator()
-            for await result in session.transcript { accumulator.add(result) }
-            return accumulator.preview
+        let live = Live()
+        let collecting = await live.collect(session.transcript)
+        defer { collecting.cancel() }
+
+        // Same precondition as the test above, and it has to be established *before* the
+        // device is destroyed: afterwards there would be no way to tell "the code went deaf"
+        // from "this machine was never able to hear itself".
+        guard await canHearItself(live, saying: "sound check", listeningFor: "check") else {
+            _ = await service.stopRecognition()
+            return
         }
-        try await Task.sleep(for: .seconds(1))
 
         // The microphone vanishes mid-sentence.
         AudioHardwareDestroyAggregateDevice(aggregate)
@@ -119,8 +163,7 @@ struct LiveCaptureRecoveryTests {
         #expect(await service.restartCapture())
         _ = await service.stopRecognition()
 
-        let text = await collected.value.lowercased()
-        guard !text.isEmpty else { return }  // muted output; see the test above
+        let text = await live.text
         #expect(text.contains("fox"), "went deaf when the device disappeared: \(text)")
     }
 
