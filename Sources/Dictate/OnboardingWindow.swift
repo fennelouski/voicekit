@@ -13,6 +13,18 @@ import AVFoundation
 import Speech
 import SwiftUI
 
+/// Decides whether a launch needs the guided permission screen. Kept free of TCC APIs so
+/// the update path can be regression-tested without changing the machine's privacy settings.
+enum PermissionRecovery {
+    static func requiresGuidedSetup(
+        microphoneGranted: Bool,
+        speechGranted: Bool,
+        accessibilityGranted: Bool
+    ) -> Bool {
+        !microphoneGranted || !speechGranted || !accessibilityGranted
+    }
+}
+
 extension Notification.Name {
     /// Posted when Accessibility trust flips on mid-onboarding, so the
     /// global hotkey monitor can re-register without an app relaunch.
@@ -303,6 +315,16 @@ private struct PermissionsStep: View {
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 10) {
+                // Speech can work without this. Put the permission that actually sends ⌘V
+                // first, so an update cannot leave someone with a working transcript but no paste.
+                PermissionRow(
+                    symbol: "accessibility",
+                    title: String(localized: "Accessibility"),
+                    detail: String(localized: "To paste text into other apps and use the global hotkey"),
+                    granted: model.accessibility,
+                    buttonTitle: String(localized: "Open Settings"),
+                    action: model.requestAccessibility
+                )
                 PermissionRow(
                     symbol: "mic.fill",
                     title: String(localized: "Microphone"),
@@ -318,14 +340,6 @@ private struct PermissionsStep: View {
                     granted: model.speech == .granted,
                     buttonTitle: model.speech == .denied ? String(localized: "Open Settings") : String(localized: "Grant"),
                     action: model.requestSpeech
-                )
-                PermissionRow(
-                    symbol: "accessibility",
-                    title: String(localized: "Accessibility"),
-                    detail: String(localized: "For the global hotkey, and to type into other apps"),
-                    granted: model.accessibility,
-                    buttonTitle: String(localized: "Open Settings"),
-                    action: model.requestAccessibility
                 )
             }
             .padding(.top, 16)

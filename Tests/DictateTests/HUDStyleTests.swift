@@ -11,6 +11,11 @@ import VoiceKit
 @testable import Dictate
 
 @Suite struct HUDStyleTests {
+    @Test func captureReadinessUsesAnHonestStatusMessage() {
+        #expect(HUDPhase.starting.placeholderText == "Starting microphone…")
+        #expect(HUDPhase.listening.placeholderText == "Listening…")
+    }
+
     @Test func levelClampsAtBothEnds() {
         #expect(clampedLevel(-0.5) == 0)
         #expect(clampedLevel(3) == 1)

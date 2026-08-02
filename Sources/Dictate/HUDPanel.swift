@@ -96,7 +96,7 @@ final class HUDController {
     func show() {
         model.text = ""
         model.level = 0
-        model.phase = .listening
+        model.phase = .starting
         model.locked = false
         model.appearance = .current
         panel.setContentSize(model.appearance.panelSize)
@@ -122,6 +122,10 @@ final class HUDController {
 
     func setProcessing() {
         model.phase = .processing
+    }
+
+    func setListening() {
+        model.phase = .listening
     }
 
     func showError(_ message: String) {
@@ -169,17 +173,30 @@ final class HUDController {
     }
 }
 
+enum HUDPhase: Equatable {
+    case starting
+    case listening
+    case processing
+    case error(String)
+
+    var placeholderText: String? {
+        switch self {
+        case .starting:
+            String(localized: "Starting microphone…")
+        case .listening:
+            String(localized: "Listening…")
+        case .processing, .error:
+            nil
+        }
+    }
+}
+
 @MainActor
 final class HUDModel: ObservableObject {
-    enum Phase: Equatable {
-        case listening
-        case processing
-        case error(String)
-    }
 
     @Published var text = ""
     @Published var level: Float = 0
-    @Published var phase: Phase = .listening
+    @Published var phase: HUDPhase = .starting
     @Published var locked = false
     @Published var appearance = HUDAppearance.current
 }
@@ -226,6 +243,8 @@ struct HUDView: View {
     @ViewBuilder
     private var phaseContent: some View {
         switch model.phase {
+        case .starting:
+            starting.transition(.blurReplace)
         case .listening:
             listening.transition(.blurReplace)
         case .processing:
@@ -248,6 +267,14 @@ struct HUDView: View {
                     .foregroundStyle(.secondary)
                     .imageScale(.small)
             }
+        }
+    }
+
+    private var starting: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text(HUDPhase.starting.placeholderText!)
         }
     }
 
@@ -297,7 +324,7 @@ struct HUDView: View {
 
     private var displayText: String {
         let text = model.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? String(localized: "Listening…") : String(text.suffix(60))
+        return text.isEmpty ? HUDPhase.listening.placeholderText! : String(text.suffix(60))
     }
 }
 

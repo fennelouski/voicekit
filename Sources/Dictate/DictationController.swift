@@ -102,7 +102,6 @@ final class DictationController {
         pendingStop = false
         accumulator.reset()
         hud.show()
-        onListeningChange?(true)
 
         Task {
             do {
@@ -141,8 +140,12 @@ final class DictationController {
                     }
                 }
 
+                // Cold starts can spend seconds opening the recognizer and microphone. Keep
+                // the HUD in its starting state until the service has successfully started it.
                 isStarting = false
                 isListening = true
+                hud.setListening()
+                onListeningChange?(true)
                 startWatchdog()
                 if pendingStop {
                     pendingStop = false

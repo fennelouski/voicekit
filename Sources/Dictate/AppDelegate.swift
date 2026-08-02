@@ -119,9 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The onboarding/permission flow, gated behind Terms acceptance.
     private func beginAfterTerms() {
-        if Settings.onboardingComplete {
-            promptForPermissionsIfNeeded()
-        } else {
+        let needsGuidedSetup = PermissionRecovery.requiresGuidedSetup(
+            microphoneGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+            speechGranted: SpeechRecognitionService.authorizationStatus() == .authorized,
+            accessibilityGranted: AXIsProcessTrusted()
+        )
+        if !Settings.onboardingComplete || needsGuidedSetup {
             showOnboarding()
         }
     }
@@ -241,18 +244,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showHistory() {
         historyPanel.toggle()
-    }
-
-    /// Post-onboarding launches: quietly prompt for anything still missing.
-    private func promptForPermissionsIfNeeded() {
-        if !AXIsProcessTrusted() {
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            _ = AXIsProcessTrustedWithOptions(options)
-        }
-        Task {
-            _ = await SpeechRecognitionService.requestAuthorization()
-            _ = await AVCaptureDevice.requestAccess(for: .audio)
-        }
     }
 
     private func showOnboarding() {
