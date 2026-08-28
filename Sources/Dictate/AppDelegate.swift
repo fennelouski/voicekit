@@ -201,6 +201,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         historyItem.keyEquivalentModifierMask = [.control, .option, .command]
         historyItem.target = self
         menu.addItem(historyItem)
+        // Transcripts are files on disk, so the menu is the only place they can be found
+        // from — a Settings toggle nobody opens isn't discovery.
+        let transcriptsItem = NSMenuItem(
+            title: String(localized: "Open Transcripts Folder"), action: #selector(openTranscripts), keyEquivalent: ""
+        )
+        transcriptsItem.target = self
+        menu.addItem(transcriptsItem)
         menu.addItem(.separator())
         let settingsItem = NSMenuItem(title: String(localized: "Settings…"), action: #selector(showSettings), keyEquivalent: ",")
         // Advertise the global shortcut, not ⌘, — that's the one that still works once the
@@ -244,6 +251,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showHistory() {
         historyPanel.toggle()
+    }
+
+    @objc private func openTranscripts() {
+        try? FileManager.default.createDirectory(
+            at: LearningPaths.transcripts, withIntermediateDirectories: true
+        )
+        NSWorkspace.shared.open(LearningPaths.transcripts)
     }
 
     private func showOnboarding() {

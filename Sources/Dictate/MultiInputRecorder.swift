@@ -13,7 +13,9 @@ import Foundation
 
 @available(macOS 26.0, *)
 actor MultiInputRecorder {
-    private let fileURL: URL
+    /// Where the transcript lands. Nonisolated so the caller can reveal it in Finder
+    /// the moment the session finishes.
+    nonisolated let fileURL: URL
     private let started: Date
     private var stopped: Date?
     /// Footer descriptions, e.g. "Nathan — MacBook Pro Microphone".

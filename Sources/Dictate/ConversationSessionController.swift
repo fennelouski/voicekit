@@ -142,6 +142,9 @@ final class ConversationSessionController {
             }
 
             await recorder.finish()
+            // The whole point of recording was the transcript — hand it over instead of
+            // leaving it in a folder nobody can find.
+            NSWorkspace.shared.activateFileViewerSelecting([recorder.fileURL])
             if let dir { try? FileManager.default.removeItem(at: dir) }
             state = .idle
             onStateChange?(.idle)
