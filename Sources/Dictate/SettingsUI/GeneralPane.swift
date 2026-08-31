@@ -6,6 +6,7 @@
 //
 
 #if os(macOS)
+import AppKit
 import SwiftUI
 
 @available(macOS 26.0, *)
@@ -74,6 +75,12 @@ struct GeneralPane: View {
                 Text("Dictate starts hidden and waits for your hotkey.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                // Updates install themselves on relaunch; this is the same manual check the
+                // menu bar offers, for people who never open that menu.
+                Button("Check for Updates…") {
+                    (NSApp.delegate as? AppDelegate)?.checkForUpdates(nil)
+                }
             } header: {
                 SettingsLabel(String(localized: "System"), systemImage: "gearshape", tint: SettingsTint.system)
             }

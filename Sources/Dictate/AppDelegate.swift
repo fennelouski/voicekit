@@ -253,6 +253,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         historyPanel.toggle()
     }
 
+    /// Sparkle's own action, wrapped so Settings can trigger it without importing Sparkle.
+    @objc func checkForUpdates(_ sender: Any?) {
+        updaterController.checkForUpdates(sender)
+    }
+
     @objc private func openTranscripts() {
         try? FileManager.default.createDirectory(
             at: LearningPaths.transcripts, withIntermediateDirectories: true
