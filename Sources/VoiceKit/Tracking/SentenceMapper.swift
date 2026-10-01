@@ -2,7 +2,7 @@
 //  SentenceMapper.swift
 //  VoiceKit
 //
-//  Utility for detecting sentence boundaries in scripts using NSLinguisticTagger.
+//  Utility for detecting sentence boundaries in scripts using Foundation.
 //  Provides navigation to previous/next sentence starts for keyboard controls.
 //
 
@@ -18,22 +18,13 @@ public final class SentenceMapper {
         detectSentences()
     }
 
-    /// Detect all sentence boundaries in the text using NSLinguisticTagger.
+    /// Foundation's sentence enumeration supports sentence ranges without word token filtering.
     private func detectSentences() {
         guard !text.isEmpty else { return }
 
-        let tagger = NSLinguisticTagger(tagSchemes: [.tokenType], options: 0)
-        tagger.string = text
-
-        let range = NSRange(location: 0, length: (text as NSString).length)
-        let options: NSLinguisticTagger.Options = [.omitWhitespace, .omitPunctuation, .omitOther]
-
         var ranges: [Range<String.Index>] = []
-
-        tagger.enumerateTags(in: range, unit: .sentence, scheme: .tokenType, options: options) { _, tokenRange, _ in
-            if let range = Range(tokenRange, in: text) {
-                ranges.append(range)
-            }
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: [.bySentences, .substringNotRequired]) { _, range, _, _ in
+            ranges.append(range)
         }
 
         sentenceRanges = ranges

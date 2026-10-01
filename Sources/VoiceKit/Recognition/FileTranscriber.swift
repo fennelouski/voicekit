@@ -49,16 +49,14 @@ public enum FileTranscriber {
         // stream ends when the analyzer finishes.
         let collector = Task {
             var segments: [TranscriptionResult] = []
-            do {
-                for try await result in transcriber.results where result.isFinal {
-                    let text = String(result.text.characters)
-                    guard !text.isEmpty else { continue }
-                    segments.append(TranscriptionResult(
-                        text: text, isFinal: true,
-                        start: result.range.start.seconds.isFinite ? result.range.start.seconds : nil,
-                        end: result.range.end.seconds.isFinite ? result.range.end.seconds : nil))
-                }
-            } catch {}
+            for try await result in transcriber.results where result.isFinal {
+                let text = String(result.text.characters)
+                guard !text.isEmpty else { continue }
+                segments.append(TranscriptionResult(
+                    text: text, isFinal: true,
+                    start: result.range.start.seconds.isFinite ? result.range.start.seconds : nil,
+                    end: result.range.end.seconds.isFinite ? result.range.end.seconds : nil))
+            }
             return segments
         }
 
@@ -73,10 +71,10 @@ public enum FileTranscriber {
         } catch {
             await analyzer.cancelAndFinishNow()
             collector.cancel()
-            _ = await collector.value
+            _ = try? await collector.value
             throw error
         }
 
-        return await collector.value
+        return try await collector.value
     }
 }

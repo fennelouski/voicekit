@@ -50,6 +50,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
     // Audio buffer forwarding (for camera recording mux)
     private var audioBufferContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
+    private var timestampedAudioContinuation: AsyncStream<CapturedAudioBuffer>.Continuation?
 
     // Tasks for consuming results
     private var resultsTask: Task<Void, Swift.Error>?
@@ -190,8 +191,13 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         }
 
         // Set up audio buffer stream (for camera recording mux)
-        let audioBufferStream = AsyncStream<AVAudioPCMBuffer> { continuation in
+        // Consumers capture live audio; an absent/slow consumer must not retain the whole session.
+        let audioBufferStream = AsyncStream<AVAudioPCMBuffer>(bufferingPolicy: .bufferingNewest(32)) { continuation in
             self.audioBufferContinuation = continuation
+        }
+        // Bound the unused stream while the user is prompting without recording.
+        let timestampedAudioStream = AsyncStream<CapturedAudioBuffer>(bufferingPolicy: .bufferingNewest(32)) { continuation in
+            self.timestampedAudioContinuation = continuation
         }
 
         // Set up transcript stream
@@ -243,7 +249,8 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
         return RecognitionSession(
             transcript: transcriptStream, level: levelStream,
-            audioBuffers: audioBufferStream, backupURL: backup?.url
+            audioBuffers: audioBufferStream, backupURL: backup?.url,
+            timestampedAudioBuffers: timestampedAudioStream
         )
     }
 
@@ -333,6 +340,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         // Capture references for the tap callback
         let levelCont = levelContinuation
         let audioBufferCont = audioBufferContinuation
+        let timestampedAudioCont = timestampedAudioContinuation
         let inputBuilder = inputContinuation
         let converter = bufferConverter
         let targetFormat = analyzerFormat
@@ -342,7 +350,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         // one counter per engine is exactly the lifetime we want anyway.
         var levelBufferCount = 0
 
-        let tap: AVAudioNodeTapBlock = { buffer, _ in
+        let tap: AVAudioNodeTapBlock = { buffer, time in
             heartbeat.beat()
 
             // Feed converted audio to the analyzer
@@ -359,6 +367,9 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
             // Forward raw audio buffer for camera recording
             audioBufferCont?.yield(buffer)
+            if let captured = CapturedAudioBuffer.copy(buffer, at: time) {
+                timestampedAudioCont?.yield(captured)
+            }
 
             // Compute RMS level for mic indicator (throttled)
             levelBufferCount += 1
@@ -430,6 +441,8 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         levelContinuation = nil
         audioBufferContinuation?.finish()
         audioBufferContinuation = nil
+        timestampedAudioContinuation?.finish()
+        timestampedAudioContinuation = nil
 
         // Deactivate audio session (iOS/visionOS only)
         #if os(iOS) || os(visionOS)
