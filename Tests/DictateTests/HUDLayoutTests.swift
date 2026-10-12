@@ -11,6 +11,15 @@ import Testing
 @testable import Dictate
 
 @Suite struct HUDLayoutTests {
+    @Test func longErrorsExpandThePanelAtEveryTextSize() {
+        let message = Array(repeating: "Microphone access failed. Open Settings and allow speech recognition.", count: 6).joined(separator: " ")
+        for textSize in HUDTextSize.allCases {
+            let look = HUDAppearance(textSize: textSize)
+            #expect(look.panelSize(forError: message).height > look.panelSize.height * 2)
+            #expect(look.panelSize(forError: "Permission denied").width == look.panelSize.width)
+        }
+    }
+
     /// A 1440×900 screen with the menu bar already excluded, like `visibleFrame` gives you.
     private let screen = NSRect(x: 0, y: 0, width: 1440, height: 875)
 

@@ -199,15 +199,16 @@ struct KeyboardView: View {
     }
 
     private var statusLine: some View {
-        Text(model.status ?? (model.preview.isEmpty ? hint : model.preview))
-            .font(.callout)
-            .foregroundStyle(model.status != nil ? Color.orange : (model.preview.isEmpty ? Color.secondary : Color.primary))
-            // Errors carry the full OS reason; let them wrap and shrink rather than truncate.
-            .lineLimit(model.status != nil ? 6 : 2)
-            .minimumScaleFactor(0.7)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 40, alignment: .center)
-            .padding(.horizontal, 16)
+        ScrollView {
+            Text(model.status ?? (model.preview.isEmpty ? hint : model.preview))
+                .font(.callout)
+                .foregroundStyle(model.status != nil ? Color.orange : (model.preview.isEmpty ? Color.secondary : Color.primary))
+                .lineLimit(model.status != nil || model.preview.isEmpty ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .center)
+                .padding(.horizontal, 16)
+        }.frame(minHeight: 40, maxHeight: 120)
     }
 
     private var hint: String {

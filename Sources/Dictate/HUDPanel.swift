@@ -43,6 +43,13 @@ struct HUDAppearance: Equatable {
         NSSize(width: pillMaxWidth + Self.bloom * 2, height: pillHeight + Self.bloom * 2)
     }
 
+    func panelSize(forError message: String) -> NSSize {
+        let font = NSFont.systemFont(ofSize: textSize.points, weight: .medium)
+        let height = (message as NSString).boundingRect(with: NSSize(width: pillMaxWidth - 64, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font]).height
+        return NSSize(width: panelSize.width, height: max(panelSize.height, ceil(height) + 20 + Self.bloom * 2))
+    }
+
     /// Inside the panel, which is only a bloom's width bigger than the pill: the horizontal
     /// edge is all that matters, because the pill hugs it and grows inward toward the centre
     /// of the screen. Vertically the panel hugs the pill and the *panel* is what moves.
@@ -130,6 +137,7 @@ final class HUDController {
 
     func showError(_ message: String) {
         model.phase = .error(message)
+        panel.setContentSize(model.appearance.panelSize(forError: message))
         position()
         panel.orderFrontRegardless()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
@@ -291,7 +299,7 @@ struct HUDView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.yellow)
             Text(message)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
