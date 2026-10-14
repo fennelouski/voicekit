@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate 会聆听你的声音以输入你所说的内容。音频绝不会离开这台 Mac。",
-    "NSSpeechRecognitionUsageDescription": "Dictate 会在设备端转录你的语音。不会将任何音频或文本发送到任何地方。",
+    "NSSpeechRecognitionUsageDescription": "语音在设备上转录，以输入你说的内容。",
     "NSAudioCaptureUsageDescription": "Dictate 仅在你发起对话录制期间捕捉其他 App 的音频。音频绝不会离开这台 Mac。"
   }
 }

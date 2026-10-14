@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate lắng nghe giọng nói của bạn để gõ những gì bạn nói. Âm thanh không bao giờ rời khỏi máy Mac này.",
-    "NSSpeechRecognitionUsageDescription": "Dictate phiên âm lời nói của bạn trên thiết bị. Không có âm thanh hay văn bản nào được gửi đi đâu.",
+    "NSSpeechRecognitionUsageDescription": "Lời nói được phiên âm trên thiết bị để nhập những gì bạn nói.",
     "NSAudioCaptureUsageDescription": "Dictate chỉ thu âm thanh của ứng dụng khác trong lúc bạn ghi âm cuộc trò chuyện. Âm thanh không bao giờ rời khỏi máy Mac này."
   }
 }

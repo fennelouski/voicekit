@@ -15,16 +15,18 @@ import Foundation
 import VoiceKit
 
 enum CleanupChain {
-    struct Result: Equatable {
+    struct Result: Equatable, Sendable {
         /// The cleaned text, or the original if nothing in the chain worked.
         let text: String
         /// The step that produced it. Nil means every step failed.
         let usedStep: CleanupMode?
         /// Steps that were tried and didn't work, in order.
         let failed: [CleanupMode]
+        var isCancelled = false
+        var failureReasons: [CleanupMode: CleanupFailure] = [:]
 
         /// Only true when the chain had work to do and none of it landed.
-        var allFailed: Bool { usedStep == nil && !failed.isEmpty }
+        var allFailed: Bool { !isCancelled && usedStep == nil && !failed.isEmpty }
     }
 
     /// Run `chain` in order, taking the first success.
@@ -39,31 +41,40 @@ enum CleanupChain {
         runStep: (String, CleanupMode, [Correction]) async throws -> String
     ) async -> Result {
         var failed: [CleanupMode] = []
+        var reasons: [CleanupMode: CleanupFailure] = [:]
 
         for step in chain where step != .off {
+            if Task.isCancelled { return Result(text: text, usedStep: nil, failed: failed, isCancelled: true, failureReasons: reasons) }
             do {
                 let cleaned = try await runStep(text, step, hints)
+                if Task.isCancelled { return Result(text: text, usedStep: nil, failed: failed, isCancelled: true, failureReasons: reasons) }
                 let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
                 // A step that hands back nothing hasn't cleaned anything — keep going rather
                 // than inserting an empty string.
                 guard !trimmed.isEmpty else {
+                    reasons[step] = .emptyOutput
                     failed.append(step)
                     continue
                 }
                 // A step that answered, refused, or otherwise rewrote the transcript isn't a
                 // cleanup — discard it so we never paste words the user didn't say.
                 guard TranscriptCleaner.preservesWording(original: text, cleaned: trimmed) else {
+                    reasons[step] = .invalidOutput
                     failed.append(step)
                     continue
                 }
-                return Result(text: trimmed, usedStep: step, failed: failed)
+                return Result(text: trimmed, usedStep: step, failed: failed, failureReasons: reasons)
             } catch {
+                if error is CancellationError || Task.isCancelled {
+                    return Result(text: text, usedStep: nil, failed: failed, isCancelled: true, failureReasons: reasons)
+                }
+                reasons[step] = CleanupFailure.classify(error)
                 failed.append(step)
             }
         }
 
         // Never lose the transcript: the caller inserts the locally cleaned text as-is.
-        return Result(text: text, usedStep: nil, failed: failed)
+        return Result(text: text, usedStep: nil, failed: failed, failureReasons: reasons)
     }
 
     /// Where a newly added step belongs.
@@ -88,7 +99,7 @@ enum CleanupChain {
         case .off:
             return text
         case .onDevice:
-            return try await AICleanup.clean(text, hints: hints)
+            return try await AICleanup.clean(text, hints: hints, customInstructions: Settings.cleanupInstructions)
         default:
             guard let provider = step.provider else { return text }
             return try await CleanupService.clean(text, provider: provider, hints: hints)

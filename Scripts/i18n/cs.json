@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate poslouchá váš hlas, aby psal to, co říkáte. Zvuk nikdy neopustí tento Mac.",
-    "NSSpeechRecognitionUsageDescription": "Dictate přepisuje vaši řeč v zařízení. Žádný zvuk ani text se nikam neodesílá.",
+    "NSSpeechRecognitionUsageDescription": "Řeč se přepisuje přímo v zařízení, aby se napsalo, co říkáte.",
     "NSAudioCaptureUsageDescription": "Dictate zachytává zvuk jiné aplikace pouze během nahrávání konverzace, které sami spustíte. Zvuk nikdy neopustí tento Mac."
   }
 }

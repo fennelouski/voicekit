@@ -45,7 +45,7 @@ struct DictationHistoryTests {
         let writer = DictationHistory(fileURL: url)
         writer.add(.init(date: Date(), stages: [
             .init(label: "Raw", systemImage: "waveform", text: "um hello world", status: .applied, changePercent: nil),
-            .init(label: "Claude", systemImage: "cloud", text: "", status: .failed, changePercent: nil),
+            .init(label: "Claude", systemImage: "cloud", text: "", status: .failed, changePercent: nil, failure: .rateLimited),
             .init(label: "Apple Intelligence", systemImage: "apple.logo", text: "Hello world.", status: .applied, changePercent: 40),
         ]))
 
@@ -55,7 +55,7 @@ struct DictationHistoryTests {
         // The inserted text is the last *applied* stage, not the failed attempt after it.
         #expect(entries.first?.text == "Hello world.")
         #expect(entries.first?.stages.count == 3)
-        #expect(entries.first?.stages.contains { $0.status == .failed } == true)
+        #expect(entries.first?.stages.contains { $0.status == .failed && $0.failure == .rateLimited } == true)
     }
 
     @Test func clearWipesMemoryAndFile() {
@@ -93,7 +93,9 @@ struct DictationHistoryTests {
 
         // Forever while writing, so both an old and a fresh entry land on disk.
         UserDefaults.standard.set(HistoryRetention.forever.rawValue, forKey: Settings.dictationHistoryRetentionKey)
-        let history = DictationHistory(fileURL: tempURL())
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let history = DictationHistory(fileURL: url)
         history.add(.init(date: Date().addingTimeInterval(-10 * 86_400), stages: [
             .init(label: "Raw", systemImage: "waveform", text: "ten days old", status: .applied, changePercent: nil),
         ]))
@@ -103,6 +105,8 @@ struct DictationHistoryTests {
         // Shortening the window prunes the old entry on the very next read, no relaunch needed.
         UserDefaults.standard.set(HistoryRetention.day.rawValue, forKey: Settings.dictationHistoryRetentionKey)
         #expect(history.recent().map(\.text) == ["just now"])
+        let persisted = try? JSONDecoder().decode([DictationHistory.Entry].self, from: Data(contentsOf: url))
+        #expect(persisted?.map(\.text) == ["just now"])
     }
 }
 

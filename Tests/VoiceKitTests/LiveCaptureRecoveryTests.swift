@@ -7,8 +7,8 @@
 //  refusing to die on a device ID that no longer names anything. None are reachable from
 //  a unit test — the failures they guard live in Core Audio, not in our bookkeeping.
 //
-//  Skips (passes) without speech authorization. The transcript assertions additionally
-//  need the machine to hear its own speakers, so they stand down when output is muted.
+//  Explicitly opt in with VOICEKIT_HARDWARE_TESTS=1. These tests require an
+//  authorized microphone and audible speaker loopback; CI reports real skips.
 //
 
 import AVFoundation
@@ -20,7 +20,8 @@ import Testing
 #if os(macOS)
 /// Serialized: there is one microphone, and two of these tests talking into it at once
 /// hear each other.
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["VOICEKIT_HARDWARE_TESTS"] == "1",
+                            "Opt-in microphone integration: set VOICEKIT_HARDWARE_TESTS=1"))
 struct LiveCaptureRecoveryTests {
 
     /// Speak through the speakers so the microphone hears it. Crude, and exactly what the
@@ -48,7 +49,7 @@ struct LiveCaptureRecoveryTests {
         func heard(_ word: String) -> Bool { text.contains(word) }
 
         func collect(_ transcript: AsyncStream<TranscriptionResult>) -> Task<Void, Never> {
-            Task { for await result in transcript { await self.add(result) } }
+            Task { for await result in transcript { self.add(result) } }
         }
     }
 
@@ -58,8 +59,8 @@ struct LiveCaptureRecoveryTests {
     /// not something a test can insist on: output may be muted, the volume low, the room
     /// loud, or someone talking nearby — during one run this test transcribed a conversation
     /// happening next to the laptop. All of those are the environment failing to cooperate,
-    /// not the code being wrong, and a test that reports them as bugs gets ignored, which
-    /// costs more than the coverage is worth. So they skip.
+    /// not proof of a capture regression. An explicitly opted-in run reports that missing
+    /// prerequisite as an issue rather than claiming recovery was measured.
     private func canHearItself(_ live: Live, saying phrase: String, listeningFor word: String) async -> Bool {
         speak(phrase)
         // Recognition trails the audio; give it a moment before deciding nothing arrived.
@@ -69,7 +70,7 @@ struct LiveCaptureRecoveryTests {
         }
         // Said out loud, because a silent skip is indistinguishable from a test that ran —
         // which is how this file came to be green while proving nothing.
-        print("[LiveCaptureRecovery] skipped: said \"\(phrase)\" and heard nothing back. "
+        print("[LiveCaptureRecovery] prerequisite unavailable: said \"\(phrase)\" and heard nothing back. "
               + "Unmute output and turn the volume up to run these for real.")
         return false
     }
@@ -78,7 +79,7 @@ struct LiveCaptureRecoveryTests {
     /// bring it back, and the words from before the break must still be there afterwards.
     @Test func captureRestartsMidSessionAndTheTranscriptCarriesOn() async throws {
         guard #available(macOS 26.0, *) else { return }
-        guard SpeechRecognitionService.authorizationStatus() == .authorized else { return }
+        try #require(SpeechRecognitionService.authorizationStatus() == .authorized, "Speech permission is required")
         let service = SpeechRecognitionService()
         let session = try await service.startRecognition(locale: Locale(identifier: "en_US"))
 
@@ -91,6 +92,7 @@ struct LiveCaptureRecoveryTests {
         // anything either, so there is no test to run.
         guard await canHearItself(live, saying: "the quick brown fox", listeningFor: "fox") else {
             _ = await service.stopRecognition()
+            Issue.record("Speaker loopback unavailable; this run did not measure capture recovery")
             return
         }
 
@@ -124,8 +126,9 @@ struct LiveCaptureRecoveryTests {
     /// changes, dictation goes deaf while still looking alive, and this test says so.
     @Test func aDeviceThatCeasesToExistMidSessionDoesNotTakeTheTranscriptWithIt() async throws {
         guard #available(macOS 26.0, *) else { return }
-        guard SpeechRecognitionService.authorizationStatus() == .authorized else { return }
-        guard let uid = defaultInputUID(), let aggregate = makeAggregate(over: uid) else { return }
+        try #require(SpeechRecognitionService.authorizationStatus() == .authorized, "Speech permission is required")
+        let uid = try #require(defaultInputUID(), "An input device is required")
+        let aggregate = try #require(makeAggregate(over: uid), "Could not create the test aggregate device")
         // The test destroys this itself, mid-session — that's the point of it. This is for
         // every other way out: a throw, a cancellation, a stopped run. An aggregate device
         // outlives the process that made it, and leaving one registered on the developer's
@@ -145,6 +148,7 @@ struct LiveCaptureRecoveryTests {
         // from "this machine was never able to hear itself".
         guard await canHearItself(live, saying: "sound check", listeningFor: "check") else {
             _ = await service.stopRecognition()
+            Issue.record("Speaker loopback unavailable; this run did not measure capture recovery")
             return
         }
 
@@ -199,7 +203,7 @@ struct LiveCaptureRecoveryTests {
     /// start anyway, on whatever the system's default input is.
     @Test func aDeviceIDThatNamesNothingFallsBackToTheSystemDefault() async throws {
         guard #available(macOS 26.0, *) else { return }
-        guard SpeechRecognitionService.authorizationStatus() == .authorized else { return }
+        try #require(SpeechRecognitionService.authorizationStatus() == .authorized, "Speech permission is required")
         let service = SpeechRecognitionService()
         // Core Audio never allocates IDs this high, so this is guaranteed to be stale.
         _ = try await service.startRecognition(locale: Locale(identifier: "en_US"), inputDeviceID: 999_999)

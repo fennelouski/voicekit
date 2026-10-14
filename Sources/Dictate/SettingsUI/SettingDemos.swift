@@ -9,6 +9,7 @@
 
 #if os(macOS)
 import SwiftUI
+import Combine
 import VoiceKit
 
 // MARK: - Shared chrome
@@ -397,7 +398,7 @@ func cleanupDemoNote(_ mode: CleanupMode) -> String {
     case .onDevice:
         return String(localized: "Punctuation and false starts fixed, entirely on this Mac.")
     case .local:
-        return String(localized: "Same, on a model you host yourself. Nothing leaves your machine.")
+        return String(localized: "Same, on a server you configure. Text stays on this Mac only if the server runs here.")
     default:
         let name = mode.provider?.displayName ?? String(localized: "the provider")
         return String(format: String(localized: "Same, plus any custom instructions you give it. The transcript goes to %@; a typical dictation costs a fraction of a cent."), name)

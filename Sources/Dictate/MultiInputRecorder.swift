@@ -5,7 +5,7 @@
 //  Merged transcript for conversation recording: segments arrive from several
 //  named sources (mics, app taps), each stamped with wall-clock time, and the
 //  document is rewritten in timestamp order after every addition. No diarization
-//  needed — the input IS the speaker.
+//  needed here — labels identify sources, which can contain several voices.
 //
 
 #if os(macOS)
@@ -30,7 +30,7 @@ actor MultiInputRecorder {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        fileURL = directory.appendingPathComponent("Conversation \(formatter.string(from: started)).md")
+        fileURL = directory.appendingPathComponent("Conversation \(formatter.string(from: started))-\(UUID().uuidString.prefix(8)).md")
     }
 
     func addSegment(speaker: String, at date: Date, text: String) {
@@ -45,18 +45,21 @@ actor MultiInputRecorder {
         write()
     }
 
-    func finish() {
+    @discardableResult
+    func finish() -> Bool {
         stopped = Date()
-        write()
+        return write()
     }
 
-    private func write() {
+    @discardableResult
+    private func write() -> Bool {
         var rendered = "# Conversation — \(started.formatted(date: .abbreviated, time: .shortened))\n\n"
         rendered += ConversationMerge.render(entries)
         rendered += TranscriptFooter.render(sources: sources, started: started, stopped: stopped)
         // ponytail: rewrite the whole file atomically each update, same as ConversationRecorder —
         // transcripts are KB and late segments from another source can land mid-document
-        try? rendered.data(using: .utf8)?.write(to: fileURL, options: .atomic)
+        do { try Data(rendered.utf8).write(to: fileURL, options: .atomic); return true }
+        catch { return false }
     }
 }
 

@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictateはあなたの声を聞き取り、話した内容を入力します。音声がこのMacから出ることはありません。",
-    "NSSpeechRecognitionUsageDescription": "Dictateはあなたの発話をオンデバイスで文字起こしします。音声もテキストもどこにも送信されません。",
+    "NSSpeechRecognitionUsageDescription": "話した内容を入力するため、音声はデバイス上で文字に変換されます。",
     "NSAudioCaptureUsageDescription": "Dictateは、あなたが開始した会話録音の間だけ他のAppの音声をキャプチャします。音声がこのMacから出ることはありません。"
   }
 }

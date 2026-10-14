@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let controller = DictationController()
     private let hotkeyMonitor = HotkeyMonitor()
+    private var recoveryWindow: RecoveryWindowController?
     private let historyPanel = HistoryPanelController()
     private var settingsController: SettingsWindowController?
     private var onboardingController: OnboardingWindowController?
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let conversationController = ConversationSessionController()
     private var conversationMenuItem: NSMenuItem?
     private var dictationListening = false
+    private var recoveryRetentionTask: Task<Void, Never>?
 
     // Starts Sparkle's scheduled background checks. Cadence + silent-install behaviour
     // are driven entirely by the SU* keys in Info.plist (weekly check, auto-install on
@@ -36,6 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
     )
+
+    func applicationWillTerminate(_ notification: Notification) {
+        hotkeyMonitor.stop()
+        recoveryRetentionTask?.cancel()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // First, so a crash anywhere after this point still brings the app back.
@@ -62,6 +69,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { self?.hotkeyMonitor.start() }
         }
 
+        NotificationCenter.default.addObserver(forName: .dictateOpenCleanupSettings, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.showSettings() }
+        }
+        NotificationCenter.default.addObserver(forName: .dictateShowRecovery, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.showRecovery() }
+        }
         controller.onListeningChange = { [weak self] listening in
             self?.dictationListening = listening
             self?.updateStatusIcon(listening: listening)
@@ -78,6 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .idle:
                 item.title = String(localized: "Record Conversation")
                 item.action = #selector(self.toggleConversationRecording)
+            case .starting:
+                item.title = String(localized: "Starting conversation…")
+                item.action = nil
             case .recording:
                 item.title = String(localized: "Stop Recording Conversation")
                 item.action = #selector(self.toggleConversationRecording)
@@ -88,8 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        conversationController.onRecoveryNeeded = { [weak self] in self?.showRecovery() }
+
         hotkeyMonitor.onKeyDown = { [weak self] in self?.controller.hotkeyDown() }
         hotkeyMonitor.onKeyUp = { [weak self] in self?.controller.hotkeyUp() }
+        hotkeyMonitor.onEscape = { [weak self] in self?.controller.cancel() ?? false }
         hotkeyMonitor.hotkey = Settings.hotkey
         hotkeyMonitor.start()
 
@@ -113,19 +132,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
                 self.conversationMenuItem?.isHidden = !Settings.conversationRecordingEnabled
                 self.updateStatusItemVisibility()
+                _ = DictationHistory.shared.recent()
+                Task { await self.pruneRecoveryForCurrentSettings() }
             }
         }
     }
 
     /// The onboarding/permission flow, gated behind Terms acceptance.
     private func beginAfterTerms() {
+        recoveryRetentionTask?.cancel()
+        recoveryRetentionTask = Task {
+            while !Task.isCancelled {
+                await pruneRecoveryForCurrentSettings()
+                do { try await Task.sleep(for: .seconds(300)) } catch { return }
+            }
+        }
         let needsGuidedSetup = PermissionRecovery.requiresGuidedSetup(
             microphoneGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
             speechGranted: SpeechRecognitionService.authorizationStatus() == .authorized,
             accessibilityGranted: AXIsProcessTrusted()
         )
+        Task {
+            await RecoveryStore.shared.importConversationsOnce(from: LearningPaths.conversationScratch)
+            if Settings.backupRecording {
+                await RecoveryStore.shared.importOnce(from: LearningPaths.recovery, locale: Settings.locale)
+            } else { await RecoveryStore.shared.clearDictations() }
+            await pruneRecoveryForCurrentSettings()
+            if !(await RecoveryStore.shared.records()).isEmpty, !controller.hasOutstandingWork,
+               Settings.onboardingComplete, !needsGuidedSetup { showRecovery() }
+        }
         if !Settings.onboardingComplete || needsGuidedSetup {
             showOnboarding()
+        }
+    }
+
+    private func pruneRecoveryForCurrentSettings() async {
+        if !Settings.backupRecording { await RecoveryStore.shared.clearDictations() }
+        else if let duration = Settings.backupRetention.duration {
+            await RecoveryStore.shared.expireDictations(retention: duration)
         }
     }
 
@@ -201,6 +245,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         historyItem.keyEquivalentModifierMask = [.control, .option, .command]
         historyItem.target = self
         menu.addItem(historyItem)
+        let recoveryItem = NSMenuItem(title: String(localized: "Recover Recordings…"), action: #selector(showRecovery), keyEquivalent: "")
+        recoveryItem.target = self
+        menu.addItem(recoveryItem)
         // Transcripts are files on disk, so the menu is the only place they can be found
         // from — a Settings toggle nobody opens isn't discovery.
         let transcriptsItem = NSMenuItem(
@@ -231,6 +278,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: String(localized: "Quit Dictate"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
+    }
+
+    @objc private func showRecovery() {
+        if recoveryWindow == nil { recoveryWindow = RecoveryWindowController() }
+        recoveryWindow?.show()
     }
 
     private func updateStatusIcon(listening: Bool) {

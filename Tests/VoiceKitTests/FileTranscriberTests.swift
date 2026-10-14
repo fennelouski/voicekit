@@ -3,18 +3,20 @@
 //  VoiceKitTests
 //
 //  End-to-end check of offline file transcription using synthesized speech.
-//  Skips (passes) when speech auth or the on-device model isn't available,
-//  so it stays green on CI and fresh machines.
+//  Explicitly opt in with VOICEKIT_HARDWARE_TESTS=1. CI reports a skip;
+//  opted-in runs require authorization and synthesis instead of silently passing.
 //
 
 import Foundation
 import Testing
 @testable import VoiceKit
 
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["VOICEKIT_HARDWARE_TESTS"] == "1",
+                 "Opt-in ASR integration: set VOICEKIT_HARDWARE_TESTS=1 on an authorized Mac"))
 struct FileTranscriberTests {
     @Test func transcribesSynthesizedSpeech() async throws {
         guard #available(macOS 26.0, *) else { return }
-        guard SpeechRecognitionService.authorizationStatus() == .authorized else { return }
+        try #require(SpeechRecognitionService.authorizationStatus() == .authorized, "Speech permission is required")
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("filetranscriber-\(UUID().uuidString).aiff")
@@ -25,7 +27,7 @@ struct FileTranscriberTests {
         say.arguments = ["-o", url.path, "the quick brown fox jumps over the lazy dog"]
         try say.run()
         say.waitUntilExit()
-        guard say.terminationStatus == 0 else { return }
+        try #require(say.terminationStatus == 0, "Speech fixture synthesis failed")
 
         let segments = try await FileTranscriber.transcribe(fileAt: url, locale: Locale(identifier: "en_US"))
         let text = segments.map(\.text).joined(separator: " ").lowercased()

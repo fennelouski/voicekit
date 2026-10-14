@@ -10,6 +10,12 @@ import AppKit
 
 if #available(macOS 26.0, *) {
     MainActor.assumeIsolated {
+#if DEBUG
+        if Bundle.main.bundleIdentifier == "studio.100apps.Dictate.preview" || CommandLine.arguments.contains("--preview-recovery") || CommandLine.arguments.contains("--preview-vocabulary") {
+            ReliabilityPreview.run()
+            return
+        }
+#endif
         // A Sparkle relaunch (or a stray build) can leave an older copy running. Both answer
         // the same hotkey, both write the transcript to the pasteboard, and the loser clobbers
         // the winner's clipboard mid-paste — so ⌘V lands on the wrong text or nothing at all.

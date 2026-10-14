@@ -36,13 +36,16 @@ enum DictationPipeline {
         do {
             let polished = try await polish(cleaned).trimmingCharacters(in: .whitespacesAndNewlines)
             // An empty answer isn't a polish, it's a failure that would eat the transcript.
-            if polished.isEmpty { polishFailed = true } else { text = polished }
+            if !TranscriptCleaner.preservesWording(original: cleaned, cleaned: polished) {
+                polishFailed = true
+            } else {
+                text = polished
+            }
         } catch {
             polishFailed = true
         }
 
-        // Trailing space so back-to-back dictations don't run together.
-        if let last = text.last, !last.isWhitespace { text += " " }
+        text = DictationSpacing.appendingSeparator(to: text)
         return Output(text: text, polishFailed: polishFailed)
     }
 }

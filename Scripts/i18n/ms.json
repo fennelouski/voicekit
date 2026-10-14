@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate mendengar suara anda untuk menaip apa yang anda sebut. Audio tidak pernah meninggalkan Mac ini.",
-    "NSSpeechRecognitionUsageDescription": "Dictate mentranskripsikan pertuturan anda pada peranti. Tiada audio atau teks dihantar ke mana-mana.",
+    "NSSpeechRecognitionUsageDescription": "Pertuturan ditranskripsikan pada peranti untuk menaip apa yang anda katakan.",
     "NSAudioCaptureUsageDescription": "Dictate merakam audio app lain hanya semasa rakaman perbualan yang anda mulakan. Audio tidak pernah meninggalkan Mac ini."
   }
 }

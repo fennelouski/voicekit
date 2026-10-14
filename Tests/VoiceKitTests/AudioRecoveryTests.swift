@@ -51,7 +51,7 @@ struct SafeTapTests {
     /// hardware format has gone stale. The real one only misbehaves with real hardware
     /// attached — a player or mixer node quietly accepts any format you hand it — so the
     /// retry policy can't be exercised without standing in for it.
-    private final class PickyNode: AVAudioMixerNode {
+    private final class PickyNode: AVAudioMixerNode, @unchecked Sendable {
         /// The format of each install attempt, in order.
         private(set) var attempts: [AVAudioFormat?] = []
         private(set) var removals = 0

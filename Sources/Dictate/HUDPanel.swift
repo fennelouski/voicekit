@@ -74,6 +74,7 @@ struct HUDAppearance: Equatable {
 @MainActor
 final class HUDController {
     private let model = HUDModel()
+    private var errorDismissal: DispatchWorkItem?
     private lazy var panel: NSPanel = {
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: HUDAppearance.current.panelSize),
@@ -94,6 +95,8 @@ final class HUDController {
     }()
 
     func show() {
+        errorDismissal?.cancel()
+        errorDismissal = nil
         model.text = ""
         model.level = 0
         model.phase = .starting
@@ -105,6 +108,8 @@ final class HUDController {
     }
 
     func hide() {
+        errorDismissal?.cancel()
+        errorDismissal = nil
         panel.orderOut(nil)
     }
 
@@ -129,12 +134,15 @@ final class HUDController {
     }
 
     func showError(_ message: String) {
+        errorDismissal?.cancel()
         model.phase = .error(message)
         position()
         panel.orderFrontRegardless()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+        let dismissal = DispatchWorkItem { [weak self] in
             self?.hide()
         }
+        errorDismissal = dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: dismissal)
     }
 
     private func position() {

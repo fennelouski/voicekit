@@ -24,13 +24,25 @@ enum KeychainStore {
     }
 
     /// Nil or empty deletes the item.
-    static func set(_ value: String?, forKey account: String) {
-        // ponytail: delete-then-add instead of the add/update dance
-        SecItemDelete(baseQuery(account: account) as CFDictionary)
-        guard let value, !value.isEmpty else { return }
-        var query = baseQuery(account: account)
-        query[kSecValueData as String] = Data(value.utf8)
-        SecItemAdd(query as CFDictionary, nil)
+    @discardableResult
+    static func set(_ value: String?, forKey account: String) -> Bool {
+        let query = baseQuery(account: account)
+        guard let value, !value.isEmpty else {
+            let status = SecItemDelete(query as CFDictionary)
+            return status == errSecSuccess || status == errSecItemNotFound
+        }
+        let attributes = [kSecValueData as String: Data(value.utf8)]
+        let updated = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updated == errSecSuccess { return true }
+        // A failed update must never delete a previously valid key.
+        guard updated == errSecItemNotFound else { return false }
+        var item = query
+        item[kSecValueData as String] = Data(value.utf8)
+        let added = SecItemAdd(item as CFDictionary, nil)
+        if added == errSecDuplicateItem {
+            return SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecSuccess
+        }
+        return added == errSecSuccess
     }
 
     private static func baseQuery(account: String) -> [String: Any] {

@@ -8,6 +8,7 @@
 
 import Foundation
 import Testing
+import VoiceKit
 @testable import Dictate
 
 struct OpenAICompatibleCleanupTests {
@@ -43,7 +44,7 @@ struct OpenAICompatibleCleanupTests {
         #expect(system?.contains("Reply with only the cleaned text") == true)
         #expect(system?.contains("Use British spelling.") == true)
         #expect(messages?.last?["role"] as? String == "user")
-        #expect(messages?.last?["content"] as? String == "hello world")
+        #expect(messages?.last?["content"] as? String == CleanupPrompt.input("hello world"))
     }
 
     @Test func emptyModelNameReturnsNil() {
@@ -79,5 +80,29 @@ struct OpenAICompatibleCleanupTests {
         #expect(throws: Error.self) {
             try OpenAICompatibleCleanup.parseResponse(Data("not json".utf8))
         }
+    }
+
+    @Test func fullEndpointIsNotAppendedTwiceAndProviderPathsSurvive() {
+        for base in ["https://example.test/v1/chat/completions", "https://example.test/v1/chat/completions/"] {
+            #expect(OpenAICompatibleCleanup.endpointURL(baseURL: base)?.absoluteString == "https://example.test/v1/chat/completions")
+        }
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: "https://api.groq.com/openai/v1")?.path == "/openai/v1/chat/completions")
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: "https://generativelanguage.googleapis.com/v1beta/openai")?.path == "/v1beta/openai/chat/completions")
+    }
+
+    @Test(arguments: ["localhost:11434", "file:///tmp/model", "/v1", "https://", "https://user:password@example.test", "https://example.test/v1?key=secret", "https://example.test/v1#fragment"])
+    func invalidEndpointsAreRejected(_ base: String) {
+        #expect(OpenAICompatibleCleanup.endpointURL(baseURL: base) == nil)
+    }
+
+    @Test(arguments: ["length", "content_filter", "tool_calls"])
+    func partialOrNonTextGenerationsFail(_ reason: String) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": "Partial output"], "finish_reason": reason]]])
+        #expect(throws: OpenAICompatibleError.self) { try OpenAICompatibleCleanup.parseResponse(data) }
+    }
+
+    @Test func unfinishedThinkingFails() throws {
+        let data = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": "<think>unfinished"]]]])
+        #expect(throws: CleanupOutputError.self) { try OpenAICompatibleCleanup.parseResponse(data) }
     }
 }

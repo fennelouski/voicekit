@@ -13,7 +13,34 @@ import Foundation
 import Testing
 @testable import Dictate
 
+private actor RecorderModelGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var opened = false
+    func wait() async { if !opened { await withCheckedContinuation { continuation = $0 } } }
+    func open() { opened = true; continuation?.resume(); continuation = nil }
+}
+
 struct ConversationRecorderTests {
+
+    @Test func cancelledTranscriptCannotBeRecreatedByLateCallbacks() async throws {
+        guard #available(macOS 26.0, *) else { return }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cancelled = ConversationRecorder(directory: dir)
+        let retained = ConversationRecorder(directory: dir)
+        await cancelled.addSegment(text: "cancelled words", start: 0, end: 1)
+        await retained.addSegment(text: "retained words", start: 0, end: 1)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).count == 2)
+        await cancelled.cancel()
+        await cancelled.setMicrophone("late metadata")
+        await cancelled.addSegment(text: "late words", start: 1, end: 2)
+        await cancelled.finish()
+        let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+        #expect(files.count == 1)
+        let contents = try String(contentsOf: #require(files.first), encoding: .utf8)
+        #expect(contents.contains("retained words"))
+        #expect(!contents.contains("cancelled words"))
+    }
 
     @Test func stopNeverWaitsOnModelDownload() async throws {
         guard #available(macOS 26.0, *) else { return }
@@ -21,7 +48,11 @@ struct ConversationRecorderTests {
             .appendingPathComponent("dictate-test-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let recorder = ConversationRecorder(directory: dir)
+        let gate = RecorderModelGate()
+        let recorder = ConversationRecorder(directory: dir, loadModels: {
+            await gate.wait()
+            throw CancellationError()
+        })
         let (stream, continuation) = AsyncStream<AVAudioPCMBuffer>.makeStream()
         let runTask = Task { await recorder.run(buffers: stream) }
 
@@ -42,6 +73,7 @@ struct ConversationRecorderTests {
         let stopStarted = Date()
         await runTask.value
         await recorder.finish()
+        await gate.open()
         #expect(Date().timeIntervalSince(stopStarted) < 3)
 
         // The transcript text is on disk even though diarization never ran.
@@ -49,5 +81,9 @@ struct ConversationRecorderTests {
         #expect(files.count == 1)
         let contents = try String(contentsOf: files[0], encoding: .utf8)
         #expect(contents.contains("hello there"))
+        #expect(contents.contains("Stopped:"))
+        await recorder.setMicrophone("late metadata")
+        await recorder.addSegment(text: "late words", start: 99, end: 100)
+        #expect(try String(contentsOf: files[0], encoding: .utf8) == contents)
     }
 }

@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate kuuntelee ääntäsi kirjoittaakseen sen, mitä sanot. Ääni ei koskaan poistu tästä Macista.",
-    "NSSpeechRecognitionUsageDescription": "Dictate tekstittää puheesi laitteella. Mitään ääntä tai tekstiä ei lähetetä mihinkään.",
+    "NSSpeechRecognitionUsageDescription": "Puhe litteroidaan laitteessa, jotta sanomasi voidaan kirjoittaa.",
     "NSAudioCaptureUsageDescription": "Dictate kaappaa toisen sovelluksen ääntä vain aloittamasi keskustelunauhoituksen aikana. Ääni ei koskaan poistu tältä Macilta."
   }
 }

@@ -20,6 +20,19 @@ struct CorrectionStoreTests {
         return (CorrectionStore(fileURL: url), url)
     }
 
+    @Test func pendingOrCancelledDictationCanPreviewCorrectionsWithoutCountingUsage() throws {
+        let (store, url) = makeStore()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        store.record([cooper, cooper])
+        let statsURL = url.deletingLastPathComponent().appendingPathComponent("correction-stats.json")
+        let before = try Data(contentsOf: statsURL)
+        #expect(store.apply(to: "cooper cluster", recordUsage: false) == "Kubernetes cluster")
+        #expect(store.history().first?.autoCount == 0)
+        #expect(try Data(contentsOf: statsURL) == before)
+        _ = store.apply(to: "cooper cluster")
+        #expect(CorrectionStore(fileURL: url).history().first?.autoCount == 1)
+    }
+
     @Test func appliesOnlyAtThreshold() {
         let (store, _) = makeStore()
         store.record([cooper])

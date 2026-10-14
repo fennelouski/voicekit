@@ -2,11 +2,11 @@
 
 On-device speech recognition and audio input for Apple platforms. Wraps Apple's SpeechTranscriber/SpeechAnalyzer pipeline into async-stream-based APIs with a protocol abstraction layer for swappable backends.
 
-No audio or transcript leaves the device.
+Speech recognition stays on-device. Optional cleanup providers receive text only when configured; see [Privacy](PRIVACY.md).
 
 ## Dictate — the app
 
-This repo also ships **Dictate**, a macOS menu bar app built on VoiceKit: hold **Fn** anywhere, speak, release — your words are typed into whatever app has focus. Like Wispr Flow, but 100% on-device.
+This repo also ships **Dictate**, a macOS menu bar app built on VoiceKit: hold **Fn** anywhere, speak, release — your words are typed into whatever app has focus. Recognition is entirely on-device, with optional bring-your-own-key cloud cleanup.
 
 ```sh
 Scripts/make-app.sh && open build/Dictate.app
@@ -16,11 +16,16 @@ Requires macOS 26 to run and Xcode 26 to build. On first launch, grant **Accessi
 
 - **Hold Fn** (or Right ⌘, configurable): push-to-talk — release to insert.
 - **Quick tap**: locks dictation on; tap again to stop and insert.
+- **Escape**: cancels the current dictation and all outstanding cleanup/paste jobs. Cancelled text is not copied or added to history; its recovery audio and session transcript are discarded. Dictations that already finished remain in history.
 - A floating HUD shows mic level and the live transcript while you speak. The meter comes in five styles: **Level bars**, a **Voice orb** that swells and warms with your voice, a scrolling **Waveform**, a **Sonar ripple**, or a **Breathing halo** that lights the pill itself instead of drawing a meter.
-- Filler words ("um", "uh", …) are stripped automatically. Cleanup has four modes in Settings: **Off**, **Apple Intelligence** (on-device polish), **Claude** — an opt-in, bring-your-own-key mode that sends the transcript (and nothing else) to the Anthropic API for frontier-grade rewriting — or **Custom local model** — any OpenAI-compatible server (Ollama, LM Studio, llama.cpp, MLX, vLLM) via a base URL and model name, fully local. Custom instructions apply to both. The Claude key is stored in the Keychain; if any cleanup request fails, the local transcript is inserted unchanged.
+- Filler words ("um", "uh", …) are stripped automatically. Cleanup runs as an ordered chain: **Apple Intelligence** (on-device), **Claude**, **OpenAI**, **Gemini**, **Groq**, **OpenRouter**, or a **custom OpenAI-compatible server** (Ollama, LM Studio, llama.cpp, MLX, vLLM). The first successful step wins; an unavailable model or missing key falls through. Custom instructions apply to every model. Cloud cleanup sends the transcript, relevant learned spelling hints, and explicit vocabulary, never audio; API keys live in the Keychain. A custom server keeps text on-device only when it runs on this Mac. Empty, incomplete, duplicated, or implausibly rewritten output falls through to the next provider or the original text.
+- Cleanup jobs capture their model, URL, instructions, and credentials when recording starts. A 30-second total deadline keeps cleanup from holding the queue indefinitely. Recent Dictations shows safe failure categories and a link to settings.
+- **Recover Recordings…** in the menu offers local retry, audio/text export, and deletion. Interrupted and failed dictations follow the recovery retention setting. Failed conversation source audio stays until explicitly deleted; successful audio is deleted only after the transcript document saves. Retry never pastes automatically.
+- **Vocabulary** in Settings → Input stores up to 64 exact spellings, with removal and JSON/text import/export. Matching words get their preferred casing locally and cleanup receives spelling hints. This does not bias the current Apple speech recognizer.
 - **Learns from your edits**: fix a misheard word after insertion and Dictate notices (via Accessibility), remembers the correction, and applies it automatically once it has been seen twice — reverting a correction unlearns it. Learned pairs also steer the AI cleanup prompt. Each dictation appends one compact JSONL line (stats and correction pairs, never full transcripts) to `~/Library/Application Support/Dictate/learning-log.jsonl`, entirely on-device.
-- **⌃⌥⌘V**: pops up the last hour of dictations — click one to copy it to the clipboard, press Esc (or click elsewhere) to dismiss. History is in-memory only and clears when the app quits.
-- Settings: hotkey, language, microphone, cleanup mode, learning, dictation popup style, menu bar icon (optional — hotkeys work without it; reopen the app to get Settings back), launch at login.
+- **⌃⌥⌘V**: opens recent dictations, including raw text and cleanup stages. Click one to copy it; press Esc (or click elsewhere) to dismiss. History is saved locally, enabled by default, with a one-month retention window and a 100-entry cap. Change retention, disable saving, or clear history in Settings → Privacy.
+- Text insertion preserves the clipboard’s available formats and items, and never restores over a newer copy. Consecutive dictations add a separating space for spaced languages; Chinese and Japanese endings keep their natural spacing. The app, window, and text field are captured when dictation starts and checked before insertion. If focus changed or the target cannot be verified, text stays in history and on the clipboard for manual paste. Dictate never activates a different app to deliver a delayed result.
+- Settings: hotkey, language, microphone, cleanup chain, learning, dictation popup style, menu bar icon (optional — hotkeys work without it; reopen the app to get Settings back), launch at login.
 
 ## Dictate — the iOS keyboard
 
@@ -236,12 +241,23 @@ Your app must request microphone access:
 
 ## Privacy
 
-Recognition, filler-word cleanup, and correction learning are entirely on-device. The recent-dictations history (⌃⌥⌘V) is held in memory only and is gone when the app quits. Learned corrections (`corrections.json`) and the dictation log (`learning-log.jsonl`, stats and correction pairs only — never transcripts) live in `~/Library/Application Support/Dictate/`, never in this repo. The only network calls are the two opt-in cleanup modes: **Claude** (your API key, stored in the Keychain) and **Custom local model** (your server). Both receive the transcript and nothing else, and both are off by default.
+Recognition and local filler removal run entirely on-device. History, correction statistics, recovery audio, and conversation transcripts are local data, controlled in Settings → Privacy. Optional cloud cleanup receives transcripts and learned correction hints; keys live in the Keychain. Speech and speaker models may need initial downloads, and distributed macOS builds check for updates through Sparkle. See the [privacy policy](PRIVACY.md) for storage and deletion details.
 
-## Roadmap
+## Project research
 
-Not here yet: screenshots/demo GIF, notarized releases, Homebrew cask, CONTRIBUTING.md.
+[Recording and insertion transactions](docs/recording-insertion-transactions.md) describes destination checks, Escape cancellation, and verification.
+
+[OpenWhispr learnings](docs/openwhispr-learnings.md) records the source revision reviewed, improvements applied here, and a prioritized roadmap for model support, vocabulary, capture recovery, insertion, meetings, testing, and distribution.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+## Reliability verification
+
+Run `swift test` for deterministic regressions; microphone/ASR integration is explicitly
+opt-in with `VOICEKIT_HARDWARE_TESTS=1`. Separate macOS and iOS CI, isolated UI previews,
+bundle validation, and a local `VoiceKitEvaluate` tool are documented in
+[reliability verification](docs/reliability-verification.md). That document records measured
+results and remaining app compatibility, speech corpus, localization, and release checks.

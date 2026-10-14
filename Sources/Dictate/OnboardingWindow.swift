@@ -265,7 +265,7 @@ private struct WelcomeStep: View {
             VStack(alignment: .leading, spacing: 14) {
                 FeatureRow(symbol: "lock.shield.fill",
                            title: String(localized: "Completely private"),
-                           detail: String(localized: "Speech is transcribed on your Mac's Neural Engine. Audio and text never leave this machine."))
+                           detail: String(localized: "Recognition runs on this Mac. Optional cloud cleanup sends text to the provider you choose. Audio stays local."))
                 FeatureRow(symbol: "bolt.fill",
                            title: String(localized: "Fast"),
                            detail: String(localized: "Live on-device transcription with no network round-trip — it works on airplane mode."))

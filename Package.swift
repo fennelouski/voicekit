@@ -14,6 +14,7 @@ let package = Package(
             name: "VoiceKit",
             targets: ["VoiceKit"]
         ),
+        .executable(name: "VoiceKitEvaluate", targets: ["VoiceKitEvaluate"]),
         .executable(
             name: "Dictate",
             targets: ["Dictate"]
@@ -46,6 +47,10 @@ let package = Package(
                 .swiftLanguageMode(.v5),
             ]
         ),
+        .executableTarget(name: "VoiceKitEvaluate", dependencies: ["VoiceKit"],
+                          path: "Tools/VoiceKitEvaluate", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "EvaluationTests", dependencies: ["VoiceKitEvaluate"],
+                    swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(
             name: "DictateTests",
             dependencies: ["Dictate"],

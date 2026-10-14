@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "A Dictate hallgatja a hangodat, hogy leírja, amit mondasz. A hang soha nem hagyja el ezt a Macet.",
-    "NSSpeechRecognitionUsageDescription": "A Dictate az eszközön írja át a beszédedet. Semmilyen hang vagy szöveg nem kerül sehová elküldésre.",
+    "NSSpeechRecognitionUsageDescription": "A beszéd átírása az eszközön történik az elmondott szöveg beírásához.",
     "NSAudioCaptureUsageDescription": "A Dictate csak az Ön által indított beszélgetésrögzítés közben rögzíti egy másik app hangját. A hang soha nem hagyja el ezt a Macet."
   }
 }

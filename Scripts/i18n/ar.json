@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "يستمع Dictate إلى صوتك ليكتب ما تقوله. لا يغادر الصوت هذا الـ Mac أبدًا.",
-    "NSSpeechRecognitionUsageDescription": "ينسخ Dictate كلامك على الجهاز. لا يُرسَل أي صوت أو نص إلى أي مكان.",
+    "NSSpeechRecognitionUsageDescription": "يتم تحويل الكلام إلى نص على الجهاز لكتابة ما تقوله.",
     "NSAudioCaptureUsageDescription": "لا يلتقط Dictate صوت تطبيق آخر إلا أثناء تسجيل محادثة تبدأه أنت. لا يغادر الصوت هذا الـ Mac أبدًا."
   }
 }

@@ -91,7 +91,8 @@ public final class CorrectionStore {
 
     /// Replace learned phrases (count ≥ threshold) in `text`: whole words,
     /// case-insensitive, longest phrases first, learned casing preserved.
-    public func apply(to text: String) -> String {
+    /// Set `recordUsage` to false while a cancellable insertion is still pending.
+    public func apply(to text: String, recordUsage: Bool = true) -> String {
         guard !text.isEmpty else { return text }
         var result = text
         let active = countedActivePairs().map(\.correction).sorted {
@@ -110,10 +111,12 @@ public final class CorrectionStore {
                 withTemplate: NSRegularExpression.escapedTemplate(for: pair.corrected)
             )
             // pair.heard is already lowercased — it's the countedActivePairs dictionary key.
-            stats[pair.heard, default: [:]][pair.corrected, default: Stats()].auto += matches
+            if recordUsage {
+                stats[pair.heard, default: [:]][pair.corrected, default: Stats()].auto += matches
+            }
             appliedAny = true
         }
-        if appliedAny { saveStats() }
+        if appliedAny, recordUsage { saveStats() }
         return result
     }
 
@@ -131,6 +134,17 @@ public final class CorrectionStore {
         stats = [:]
         try? FileManager.default.removeItem(at: fileURL)
         try? FileManager.default.removeItem(at: statsFileURL)
+    }
+
+    /// Remove one correction and its stored statistics without resetting others.
+    public func remove(_ correction: Correction) {
+        let heard = correction.heard.lowercased()
+        pairs[heard]?[correction.corrected] = nil
+        stats[heard]?[correction.corrected] = nil
+        if pairs[heard]?.isEmpty == true { pairs[heard] = nil }
+        if stats[heard]?.isEmpty == true { stats[heard] = nil }
+        save()
+        saveStats()
     }
 
     // MARK: - Private

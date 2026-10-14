@@ -33,4 +33,25 @@ import Testing
         #expect(output.text.isEmpty)
         #expect(output.polishFailed == false)
     }
+
+    @Test func anAnswerToADictatedQuestionIsRejected() async {
+        let raw = "what is the capital of france"
+        let output = await DictationPipeline.run(raw: raw) { _ in "Paris." }
+        #expect(output.text == raw + " ")
+        #expect(output.polishFailed)
+    }
+
+    @Test func duplicatedPolishKeepsTheOriginalText() async {
+        let raw = "can you send me the report by friday"
+        let copy = "Can you send me the report by Friday?"
+        let output = await DictationPipeline.run(raw: raw) { _ in "\(copy) \(copy)" }
+        #expect(output.text == raw + " ")
+        #expect(output.polishFailed)
+    }
+
+    @Test func japaneseDictationDoesNotInsertAnExtraASCIISpace() async {
+        let output = await DictationPipeline.run(raw: "ありがとう") { $0 }
+        #expect(output.text == "ありがとう")
+        #expect(!output.polishFailed)
+    }
 }

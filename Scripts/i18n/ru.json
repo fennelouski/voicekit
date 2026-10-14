@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate слушает ваш голос, чтобы печатать то, что вы говорите. Аудио никогда не покидает этот Mac.",
-    "NSSpeechRecognitionUsageDescription": "Dictate расшифровывает вашу речь на устройстве. Никакое аудио или текст никуда не отправляются.",
+    "NSSpeechRecognitionUsageDescription": "Речь расшифровывается на устройстве для ввода того, что вы говорите.",
     "NSAudioCaptureUsageDescription": "Dictate захватывает звук другого приложения только во время начатой вами записи разговора. Звук никогда не покидает этот Mac."
   }
 }

@@ -20,7 +20,7 @@ struct ConversationSource: Codable, Equatable, Identifiable {
     /// Microphone: Core Audio device UID (stable across reboots, unlike AudioDeviceID).
     /// App: bundle identifier.
     var reference: String
-    /// User-assigned speaker name shown in the transcript.
+    /// User-assigned source label shown in the transcript; not a detected speaker identity.
     var name: String
     var enabled: Bool
 

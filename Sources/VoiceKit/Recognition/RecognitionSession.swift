@@ -13,6 +13,9 @@ import Foundation
 public struct CapturedAudioBuffer: @unchecked Sendable {
     public let buffer: AVAudioPCMBuffer
     public let hostTime: UInt64
+    /// Wall-clock capture time resolved before queueing, so a slow writer or
+    /// sleep/wake cannot assign an old packet the delivery time after resume.
+    public let capturedAt: Date
 
     public static func copy(_ source: AVAudioPCMBuffer, at time: AVAudioTime) -> CapturedAudioBuffer? {
         guard time.isHostTimeValid, source.frameLength > 0,
@@ -26,7 +29,10 @@ public struct CapturedAudioBuffer: @unchecked Sendable {
                   inputs[index].mDataByteSize <= outputs[index].mDataByteSize else { return nil }
             memcpy(destination, sourceData, Int(inputs[index].mDataByteSize))
         }
-        return CapturedAudioBuffer(buffer: copy, hostTime: time.hostTime)
+        let hostDelta = AVAudioTime.seconds(forHostTime: time.hostTime)
+            - AVAudioTime.seconds(forHostTime: mach_absolute_time())
+        return CapturedAudioBuffer(buffer: copy, hostTime: time.hostTime,
+                                   capturedAt: Date().addingTimeInterval(hostDelta))
     }
 }
 

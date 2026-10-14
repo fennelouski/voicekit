@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate îți ascultă vocea ca să scrie ceea ce spui. Sunetul nu părăsește niciodată acest Mac.",
-    "NSSpeechRecognitionUsageDescription": "Dictate îți transcrie vorbirea pe dispozitiv. Niciun sunet sau text nu este trimis nicăieri.",
+    "NSSpeechRecognitionUsageDescription": "Vorbirea este transcrisă pe dispozitiv pentru a introduce ceea ce spui.",
     "NSAudioCaptureUsageDescription": "Dictate captează sunetul altei aplicații doar în timpul unei înregistrări de conversație pornite de tine. Sunetul nu părăsește niciodată acest Mac."
   }
 }

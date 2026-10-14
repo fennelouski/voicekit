@@ -19,6 +19,7 @@ public nonisolated class BufferConverter: @unchecked Sendable {
 
     private var converter: AVAudioConverter?
     private var lastInputFormat: AVAudioFormat?
+    private var lastOutputFormat: AVAudioFormat?
 
     public init() {}
 
@@ -28,19 +29,18 @@ public nonisolated class BufferConverter: @unchecked Sendable {
         let inputFormat = buffer.format
 
         // If formats match, return as-is
-        if inputFormat.sampleRate == format.sampleRate
-            && inputFormat.channelCount == format.channelCount
-            && inputFormat.commonFormat == format.commonFormat {
+        if inputFormat == format {
             return buffer
         }
 
         // Create or reuse converter
-        if converter == nil || lastInputFormat != inputFormat {
+        if converter == nil || lastInputFormat != inputFormat || lastOutputFormat != format {
             guard let newConverter = AVAudioConverter(from: inputFormat, to: format) else {
                 throw Error.failedToCreateConverter
             }
             converter = newConverter
             lastInputFormat = inputFormat
+            lastOutputFormat = format
         }
 
         guard let converter else {
@@ -49,7 +49,11 @@ public nonisolated class BufferConverter: @unchecked Sendable {
 
         // Calculate output frame capacity based on sample rate ratio
         let ratio = format.sampleRate / inputFormat.sampleRate
-        let outputFrameCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+        let capacity = ceil(Double(buffer.frameLength) * ratio)
+        guard capacity.isFinite, capacity > 0, capacity <= Double(UInt32.max) else {
+            throw Error.failedToCreateConversionBuffer
+        }
+        let outputFrameCapacity = AVAudioFrameCount(capacity)
         guard outputFrameCapacity > 0 else {
             throw Error.failedToCreateConversionBuffer
         }
@@ -59,12 +63,15 @@ public nonisolated class BufferConverter: @unchecked Sendable {
         }
 
         var conversionError: NSError?
-        converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+        var supplied = false
+        let status = converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+            guard !supplied else { outStatus.pointee = .noDataNow; return nil }
+            supplied = true
             outStatus.pointee = .haveData
             return buffer
         }
 
-        if let conversionError {
+        if status == .error || conversionError != nil {
             throw Error.conversionFailed(conversionError)
         }
 

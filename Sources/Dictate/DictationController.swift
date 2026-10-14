@@ -19,8 +19,77 @@ final class DictationController {
 
     var onListeningChange: ((Bool) -> Void)?
 
-    private let service = SpeechRecognitionService()
-    private let hud = HUDController()
+    private let service: any DictationRecognition
+    private let hud: any DictationHUD
+    private let captureOptions: @MainActor () -> DictationOptions
+    private let captureDestination: @MainActor () -> InsertionDestination?
+    private let prepareInsertion: @MainActor () async throws -> Void
+    private let insert: @MainActor (String, InsertionDestination?) -> InsertionResult
+    private let runStep: ((String, CleanupMode, [Correction]) async throws -> String)?
+    private let recover: (URL, Locale?) async -> String?
+    private let saveHistory: @MainActor (DictationHistory.Entry) -> Void
+    private let recordCompleted: @MainActor () -> Void
+    private let recoveryStore: RecoveryStore?
+    private let sweepRecovery: @MainActor ([URL]) -> Void
+    private var activeTransaction: DictationTransaction?
+    private var activeOptions: DictationOptions?
+    private var transactions: [UUID: DictationTransaction] = [:]
+
+    init(
+        service: (any DictationRecognition)? = nil, hud: (any DictationHUD)? = nil,
+        captureOptions: @escaping @MainActor () -> DictationOptions = { .current },
+        captureDestination: @escaping @MainActor () -> InsertionDestination? = { InsertionDestination.capture() },
+        prepareInsertion: @escaping @MainActor () async throws -> Void = { try await TextInserter.waitForPreviousPaste() },
+        insert: @escaping @MainActor (String, InsertionDestination?) -> InsertionResult = { TextInserter.insert($0, into: $1) },
+        runStep: ((String, CleanupMode, [Correction]) async throws -> String)? = nil,
+        recover: @escaping (URL, Locale?) async -> String? = { await DictationController.recoverTranscript(from: $0, locale: $1) },
+        saveHistory: @escaping @MainActor (DictationHistory.Entry) -> Void = { DictationHistory.shared.add($0) },
+        recordCompleted: @escaping @MainActor () -> Void = { Settings.recordDictationCompleted() },
+        recoveryStore: RecoveryStore? = .shared,
+        sweepRecovery: @escaping @MainActor ([URL]) -> Void = {
+            BackupRecorder.sweep(LearningPaths.recovery, keeping: $0, retention: Settings.backupRetention.duration)
+        }
+    ) {
+        self.service = service ?? SpeechRecognitionService()
+        self.hud = hud ?? HUDController()
+        self.captureOptions = captureOptions
+        self.captureDestination = captureDestination
+        self.prepareInsertion = prepareInsertion
+        self.insert = insert
+        self.runStep = runStep
+        self.recover = recover
+        self.saveHistory = saveHistory
+        self.recordCompleted = recordCompleted
+        self.sweepRecovery = sweepRecovery
+        self.recoveryStore = recoveryStore
+    }
+
+    var hasCancellableWork: Bool { transactions.values.contains { !$0.isCancelled } }
+    var hasOutstandingWork: Bool { !transactions.isEmpty }
+    var isCapturing: Bool { isStarting || isListening || isStopping }
+
+    /// Escape cancels recording and the entire outstanding insertion backlog.
+    /// New dictations do not queue behind a provider that ignores cancellation.
+    @discardableResult
+    func cancel() -> Bool {
+        guard hasCancellableWork else { return false }
+        for transaction in transactions.values { transaction.cancel() }
+        cleanupTail = Task {}
+        pendingHUDError = nil
+        pendingStop = false
+        locked = false
+        ignoreNextKeyUp = false
+        hud.hide()
+        onListeningChange?(false)
+        watchdogTask?.cancel()
+        if isStarting {
+            // Keep the service exclusive until the cancelled start has settled.
+            isStopping = true
+        } else if isListening, !isStopping {
+            requestStop()
+        }
+        return true
+    }
     private var accumulator = TranscriptAccumulator()
     private let correctionObserver = CorrectionObserver()
     private var transcriptTask: Task<Void, Never>?
@@ -95,53 +164,58 @@ final class DictationController {
     // MARK: - Session lifecycle
 
     private func start() {
+        let transaction = DictationTransaction(destination: captureDestination())
+        let options = captureOptions()
+        activeTransaction = transaction
+        activeOptions = options
+        transactions[transaction.id] = transaction
         correctionObserver.harvest()
         isStarting = true
-        // A stop requested while a *previous* start was still running, and never consumed
-        // because that start threw, would otherwise kill this session the instant it opens.
         pendingStop = false
         accumulator.reset()
         hud.show()
 
-        Task {
+        transaction.task = Task { [self] in
             do {
-                // Resolved, not read raw: the saved microphone may have been renumbered or
-                // unplugged since it was chosen, and a stale ID is how this used to die.
-                let deviceID = AudioInputSelection.resolveSelectedDeviceID()
-                let backupDirectory: URL? = Settings.backupRecording ? LearningPaths.recovery : nil
+                try transaction.checkCancellation()
+                if let recoveryStore, let scratch = options.backupDirectory {
+                    await recoveryStore.importOnce(from: scratch, locale: options.locale)
+                }
+                try transaction.checkCancellation()
                 let session = try await service.startRecognition(
-                    locale: Settings.locale, inputDeviceID: deviceID, backupDirectory: backupDirectory
+                    locale: options.locale, inputDeviceID: options.inputDeviceID,
+                    backupDirectory: options.backupDirectory
                 )
                 activeBackupURL = session.backupURL
+                try transaction.checkCancellation()
 
-                if Settings.conversationTranscripts {
+                if options.saveConversation {
                     let rec = ConversationRecorder()
                     recorder = rec
+                    transaction.discardTranscript = { Task { await rec.cancel() } }
                     audioTask = Task { await rec.run(buffers: session.audioBuffers) }
-                    // Resolved off the hot path — the transcript can wait, the audio can't.
-                    Task {
-                        await rec.setMicrophone(await Self.microphoneDescription())
-                    }
+                    Task { await rec.setMicrophone(await Self.microphoneDescription()) }
                 }
-
+                let sessionRecorder = recorder
                 transcriptTask = Task { [weak self] in
                     for await result in session.transcript {
-                        guard let self else { return }
+                        guard let self, !transaction.isCancelled,
+                              self.activeTransaction === transaction else { return }
                         self.accumulator.add(result)
                         self.hud.update(text: self.accumulator.preview)
-                        if result.isFinal, let rec = self.recorder {
-                            await rec.addSegment(text: result.text, start: result.start, end: result.end)
+                        if result.isFinal, let sessionRecorder {
+                            if !Settings.conversationTranscripts { await sessionRecorder.cancel(); continue }
+                            await sessionRecorder.addSegment(text: result.text, start: result.start, end: result.end)
                         }
                     }
                 }
                 levelTask = Task {
                     for await level in session.level {
+                        guard !transaction.isCancelled, activeTransaction === transaction else { return }
                         hud.update(level: level)
                     }
                 }
 
-                // Cold starts can spend seconds opening the recognizer and microphone. Keep
-                // the HUD in its starting state until the service has successfully started it.
                 isStarting = false
                 isListening = true
                 hud.setListening()
@@ -152,10 +226,22 @@ final class DictationController {
                     requestStop()
                 }
             } catch {
+                // A non-cooperative start may return a live session after Escape.
+                // Close it before allowing another start on the same service.
+                let backup = await service.cancelRecognition()
+                if transaction.isCancelled, let backup { try? FileManager.default.removeItem(at: backup) }
+                activeBackupURL = nil
+                activeTransaction = nil
+                activeOptions = nil
                 isStarting = false
+                isStopping = false
+                transaction.finish()
+                transactions[transaction.id] = nil
                 onListeningChange?(false)
-                Self.log.error("start failed: \(error, privacy: .public)")
-                hud.showError(Self.message(for: error))
+                if !transaction.isCancelled {
+                    Self.log.error("start failed: \(error, privacy: .public)")
+                    hud.showError(Self.message(for: error))
+                }
             }
         }
     }
@@ -171,34 +257,26 @@ final class DictationController {
     /// it was heard. Restarting the microphone alone, rather than the whole session, keeps
     /// everything already transcribed and costs the user only the second it takes to swap.
     private func startWatchdog() {
+        guard let transaction = activeTransaction else { return }
         watchdogTask?.cancel()
         watchdogTask = Task { [weak self] in
-            var failures = 0
+            var watchdog = CaptureWatchdog(stall: self?.captureStallThreshold ?? 2.5)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                guard let self, self.isListening, !self.isStopping else { return }
-                guard await self.service.silenceDuration() > self.captureStallThreshold else {
-                    failures = 0
-                    continue
+                guard let self, !Task.isCancelled, !transaction.isCancelled,
+                      self.activeTransaction === transaction, self.isListening, !self.isStopping else { return }
+                let silence = await self.service.silenceDuration()
+                guard !transaction.isCancelled, self.activeTransaction === transaction else { return }
+                guard watchdog.shouldRestart(now: ProcessInfo.processInfo.systemUptime, silence: silence) else {
+                    if !watchdog.exhausted || silence <= self.captureStallThreshold { continue }
+                    self.pendingHUDError = String(localized: "Microphone disconnected — dictation stopped")
+                    self.requestStop()
+                    return
                 }
-
                 Self.log.error("microphone stalled — restarting capture")
-                if await self.service.restartCapture() {
-                    failures = 0
-                    continue
-                }
-
-                // Three failed reconnections in a row is a microphone that isn't coming
-                // back. Stop rather than leave a HUD claiming to listen: stopping still
-                // inserts what was heard, and still recovers from the backup audio.
-                failures += 1
-                guard failures >= 3 else { continue }
-                Self.log.error("microphone did not come back — ending the session")
-                // Stopping puts the HUD into its processing state, so the message has to
-                // wait for the insert to finish or it would flash past unread.
-                self.pendingHUDError = String(localized: "Microphone disconnected — dictation stopped")
-                self.requestStop()
-                return
+                _ = await self.service.restartCapture()
+                guard !transaction.isCancelled, self.activeTransaction === transaction else { return }
+                continue
             }
         }
     }
@@ -208,45 +286,49 @@ final class DictationController {
             pendingStop = true
             return
         }
-        guard isListening, !isStopping else { return }
+        guard isListening, !isStopping, let transaction = activeTransaction,
+              let options = activeOptions else { return }
         isStopping = true
-        hud.setProcessing()
+        if !transaction.isCancelled { hud.setProcessing() }
         watchdogTask?.cancel()
         watchdogTask = nil
 
-        Task {
-            let backupURL = await service.stopRecognition()
-            // Safe to clear here and nowhere later: `isStopping` is still true, so no new
-            // session can have started and claimed this slot.
+        transaction.task = Task {
+            let backupURL: URL?
+            if transaction.isCancelled {
+                backupURL = await service.cancelRecognition()
+            } else {
+                backupURL = await service.stopRecognition()
+            }
             activeBackupURL = nil
             await transcriptTask?.value
             levelTask?.cancel()
-            // Settle the transcript file in the background. Diarization (which may be
-            // downloading models on first run) must never delay — or deadlock — the paste.
             if let rec = recorder {
                 let drain = audioTask
                 Task {
                     await drain?.value
-                    await rec.finish()
+                    if transaction.isCancelled { await rec.cancel() }
+                    else { await rec.finish() }
                 }
             }
             recorder = nil
             audioTask = nil
-
-            // Snapshot everything cleanup needs while the accumulator still holds this session.
             let raw = accumulator.committed.isEmpty ? accumulator.preview : accumulator.committed
-            let hints = Settings.learningEnabled ? CorrectionStore.shared.promptHints(limit: 20) : []
-            let chain = Settings.cleanupChain
-
-            // Recording is fully torn down here — release the hotkey now so the next dictation
-            // can start immediately, without waiting for cleanup (which may hit the network for
-            // several seconds). Cleanup + insert is handed to a serial queue below.
+            let hints = options.learning ? CorrectionStore.shared.promptHints(limit: 20) : []
             isListening = false
             isStopping = false
             locked = false
+            activeTransaction = nil
+            activeOptions = nil
             onListeningChange?(false)
 
-            enqueueCleanup(raw: raw, hints: hints, chain: chain, backup: backupURL)
+            if transaction.isCancelled {
+                if let backupURL { try? FileManager.default.removeItem(at: backupURL) }
+                transaction.finish()
+                transactions[transaction.id] = nil
+            } else {
+                enqueueCleanup(raw: raw, hints: hints, options: options, backup: backupURL, transaction: transaction)
+            }
         }
     }
 
@@ -255,68 +337,103 @@ final class DictationController {
     // Cleanup + insert runs off the recording critical path, one job at a time in the order
     // dictations were stopped: a slow (networked) cleanup never blocks the next recording, and
     // back-to-back dictations still insert in sequence. The tail task chains each job behind the
-    // previous one's completion; `pendingCleanups` tracks the backlog so only the last job, and
-    // only when nothing is being recorded, hands the HUD back.
+    // previous one's completion. The transaction registry tracks live work so only
+    // the final non-cancelled job hands the HUD back when recording is idle.
     private var cleanupTail: Task<Void, Never> = Task {}
-    private var pendingCleanups = 0
+    /// Every queued job still owns its recording. An earlier job's sweep must
+    /// not delete audio a later job has yet to recover.
+    private var recoveryRecordings = RecoveryRecordingQueue()
     /// Something went wrong during recording that the user should see, held back until the
     /// text has been inserted so it isn't overwritten by the processing state.
     private var pendingHUDError: String?
 
-    private func enqueueCleanup(raw: String, hints: [Correction], chain: [CleanupMode], backup: URL?) {
-        pendingCleanups += 1
+    private func enqueueCleanup(
+        raw: String, hints: [Correction], options: DictationOptions,
+        backup: URL?, transaction: DictationTransaction
+    ) {
+        recoveryRecordings.enqueue(backup)
+        if let backup {
+            transaction.discardRecovery = { Task { try? FileManager.default.removeItem(at: backup) } }
+        }
         let previous = cleanupTail
-        cleanupTail = Task { [weak self] in
+        let task = Task { [weak self] in
             await previous.value
             guard let self else { return }
-
-            // Live recognition came back with nothing, but the microphone was recording the
-            // whole time. Transcribe what it caught rather than telling the user their last
-            // minute of talking is gone.
             var raw = raw
             var recovered = false
-            if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let backup {
-                if let text = await Self.recoverTranscript(from: backup) {
-                    raw = text
-                    recovered = true
-                    Self.log.notice("recovered \(text.count, privacy: .public) chars from the backup recording")
+            do {
+                try transaction.checkCancellation()
+                if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let backup {
+                    if let text = await self.recover(backup, options.locale) {
+                        raw = text
+                        recovered = true
+                    }
+                    try transaction.checkCancellation()
+                }
+                let message = try await self.runCleanup(
+                    raw: raw, hints: hints, options: options, recovered: recovered, transaction: transaction
+                )
+                if self.pendingHUDError == nil { self.pendingHUDError = message }
+            } catch {
+                // Cancellation is not a failed cleanup and must never insert the
+                // fallback transcript, update history, or revive an old HUD.
+                if !(error is CancellationError), !transaction.isCancelled {
+                    Self.log.error("dictation processing failed: \(error, privacy: .public)")
                 }
             }
-
-            let failed = await self.runCleanup(raw: raw, hints: hints, chain: chain, recovered: recovered)
-
-            // This dictation's audio existed to protect these words: if they landed, it can
-            // go now; if they didn't, it survives — by default only until the next dictation
-            // finishes, which is the only window in which it's any use to anyone.
-            var keep: [URL] = []
-            if let backup, raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                keep.append(backup)
+            if !transaction.isCancelled, let recoveryStore {
+                var archived: UUID?
+                if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let backup, Settings.backupRecording {
+                    do {
+                        archived = try await recoveryStore.register(audio: backup, source: String(localized: "Untranscribed dictation"),
+                                                                    locale: options.locale, kind: .dictation).id
+                        if let archived {
+                            transaction.discardRecovery = { Task { try? await recoveryStore.delete(archived) } }
+                        }
+                        self.pendingHUDError = String(localized: "Nothing recognized — audio is available in Recover Recordings")
+                    } catch {
+                        self.pendingHUDError = String(localized: "Nothing recognized — recovery audio could not be saved")
+                    }
+                }
+                if transaction.isCancelled {
+                    if let archived { try? await recoveryStore.delete(archived) }
+                } else {
+                    await recoveryStore.expireDictations(retention: Settings.backupRetention.duration, keeping: archived)
+                }
             }
-            if let recording = self.activeBackupURL {
-                keep.append(recording)
-            }
-            BackupRecorder.sweep(
-                LearningPaths.recovery, keeping: keep, retention: Settings.backupRetention.duration
+            if transaction.isCancelled, let backup { try? FileManager.default.removeItem(at: backup) }
+            let keep = self.recoveryRecordings.complete(
+                backup, failed: !transaction.isCancelled && raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                active: self.activeBackupURL
             )
-            self.pendingCleanups -= 1
-            guard self.pendingCleanups == 0, !self.isListening, !self.isStarting else { return }
+            self.sweepRecovery(keep)
+            transaction.finish()
+            self.transactions[transaction.id] = nil
+            guard !transaction.isCancelled, !self.hasCancellableWork,
+                  !self.isListening, !self.isStarting else { return }
             if let message = self.pendingHUDError {
                 self.pendingHUDError = nil
                 self.hud.showError(message)
-            } else if failed {
-                self.hud.showError(String(localized: "Cleanup failed — inserted as-is"))
             } else {
                 self.hud.hide()
             }
         }
+        transaction.task = task
+        cleanupTail = task
     }
 
-    /// Clean, insert, and record one dictation. Returns true if the chain had work but nothing landed.
+    /// Clean, insert, and record one dictation. Returns a message to show once the queue settles.
     ///
     /// Every version the text passes through is kept as a history stage — raw, filler removed,
     /// learned corrections, and the AI polish (plus any providers that failed) — so a rewrite
     /// that went too far can be seen and recovered from Recent Dictations.
-    private func runCleanup(raw: String, hints: [Correction], chain: [CleanupMode], recovered: Bool) async -> Bool {
+    private func runCleanup(
+        raw: String, hints: [Correction], options: DictationOptions,
+        recovered: Bool, transaction: DictationTransaction
+    ) async throws -> String? {
+        try transaction.checkCancellation()
+        let chain = options.chain
         var stages: [DictationHistory.Stage] = [
             .init(label: recovered ? String(localized: "Recovered audio") : String(localized: "Raw"),
                   systemImage: recovered ? "arrow.clockwise" : "waveform", text: raw,
@@ -333,9 +450,12 @@ final class DictationController {
         }
 
         var text = TranscriptCleaner.clean(raw)
+        let correctionInput = text
         record(String(localized: "Filler removed"), "scissors", text)
-        if Settings.learningEnabled {
-            text = CorrectionStore.shared.apply(to: text)
+        text = VocabularyStore.applySpellings(to: text, terms: options.vocabulary)
+        record(String(localized: "Vocabulary spelling"), "textformat.abc", text)
+        if options.learning, Settings.learningEnabled {
+            text = CorrectionStore.shared.apply(to: text, recordUsage: false)
             record(String(localized: "Learned corrections"), "brain", text)
         }
 
@@ -346,7 +466,7 @@ final class DictationController {
             text = SpokenCommands.apply(text)
             record(String(localized: "Formatting"), "textformat", text)
         }
-        if Settings.spokenCommandsEnabled, Settings.spokenCommandsPosition == .beforeCleanup {
+        if options.spokenCommands, options.formattingPosition == .beforeCleanup {
             applyFormatting()
         }
 
@@ -354,53 +474,82 @@ final class DictationController {
         if !text.isEmpty, !chain.isEmpty {
             // Each step is tried in turn; a missing key just means that step isn't the one
             // that cleans your text. Only a chain where nothing worked is worth mentioning.
-            let result = await CleanupChain.run(text, chain: chain, hints: hints, runStep: CleanupChain.liveStep)
+            let input = text
+            let relevantHints = CleanupPrompt.relevantHints(hints, to: text)
+            let runner = runStep
+            let configurations = options.cleanupConfigurations
+            let result: CleanupChain.Result
+            var timedOut = false
+            do {
+                result = try await CleanupDeadline.run(seconds: options.cleanupDeadline) {
+                    await CleanupChain.run(input, chain: chain, hints: relevantHints) { input, step, hints in
+                        if let runner { return try await runner(input, step, hints) }
+                        guard let configuration = configurations[step] else { throw OpenAICompatibleError.missingConfig }
+                        return try await CleanupService.clean(input, configuration: configuration, hints: Settings.learningEnabled ? hints : [])
+                    }
+                }
+            } catch CleanupDeadlineError.expired {
+                timedOut = true
+                result = CleanupChain.Result(text: input, usedStep: nil, failed: [])
+            }
+            try transaction.checkCancellation()
+            if result.isCancelled { throw CancellationError() }
+            if timedOut {
+                stages.append(.init(label: String(localized: "Cleanup deadline"), systemImage: "clock",
+                                    text: "", status: .failed, changePercent: nil, failure: .timeout))
+            }
             // Providers are tried in chain order: the ones that failed come before the winner.
             for step in result.failed {
                 stages.append(.init(label: step.chainName, systemImage: step.systemImage, text: "",
-                                    status: .failed, changePercent: nil))
+                                    status: .failed, changePercent: nil, failure: result.failureReasons[step]))
             }
             if let used = result.usedStep {
                 // Force it in even at 0% — "Apple Intelligence ran and changed nothing" is worth showing.
                 record(used.chainName, used.systemImage, result.text, force: true)
             }
             text = result.text
-            cleanupFallback = result.allFailed
+            cleanupFallback = result.allFailed || timedOut
         }
 
-        if Settings.spokenCommandsEnabled, Settings.spokenCommandsPosition == .afterCleanup {
+        if options.spokenCommands, options.formattingPosition == .afterCleanup {
             applyFormatting()
         }
 
+        try transaction.checkCancellation()
         if !text.isEmpty {
-            DictationHistory.shared.add(.init(date: Date(), stages: stages))
-            Settings.recordDictationCompleted()
-            // Trailing space so back-to-back dictations don't run together.
-            if let last = text.last, !last.isWhitespace { text += " " }
-            let frontApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
-            Self.log.notice("inserting \(text.count, privacy: .public) chars into \(frontApp, privacy: .public)")
-            if TextInserter.insert(text) {
-                correctionObserver.beginObserving(inserted: text, rawLength: raw.count)
+            try await prepareInsertion()
+            try transaction.checkCancellation()
+            saveHistory(.init(date: Date(), stages: stages))
+            recordCompleted()
+            text = DictationSpacing.appendingSeparator(to: text)
+            let result = insert(text, transaction.destination)
+            if result == .pasted {
+                if options.learning, Settings.learningEnabled {
+                    // Count use only when this transaction commits a paste.
+                    _ = CorrectionStore.shared.apply(to: correctionInput)
+                    correctionObserver.beginObserving(inserted: text, rawLength: raw.count, destination: transaction.destination)
+                }
             } else {
-                Self.log.error("accessibility denied — left \(text.count, privacy: .public) chars on the clipboard")
-                hud.showError(String(localized: "Accessibility denied — press ⌘V to paste"))
+                Self.log.error("automatic paste unavailable — left \(text.count, privacy: .public) chars on the clipboard")
+                return result.message
             }
         } else {
             Self.log.notice("nothing to insert (empty transcript; raw was \(raw.count, privacy: .public) chars)")
         }
-        return cleanupFallback
+        return cleanupFallback ? String(localized: "Cleanup failed — inserted as-is") : nil
     }
 
     /// Transcribe the session's backup recording after the fact, for when live recognition
     /// produced nothing. Same on-device model, no network, just without the pressure of
     /// keeping up — which is why it can succeed where the live pass didn't.
-    private static func recoverTranscript(from url: URL) async -> String? {
+    private static func recoverTranscript(from url: URL, locale: Locale?) async -> String? {
         do {
-            let segments = try await FileTranscriber.transcribe(fileAt: url, locale: Settings.locale)
+            let segments = try await FileTranscriber.transcribe(fileAt: url, locale: locale)
             let text = segments.map(\.text).joined(separator: " ")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return text.isEmpty ? nil : text
         } catch {
+            if error is CancellationError || Task.isCancelled { return nil }
             log.error("backup transcription failed: \(error, privacy: .public)")
             return nil
         }

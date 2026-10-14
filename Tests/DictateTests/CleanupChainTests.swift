@@ -154,4 +154,15 @@ struct CleanupChainTests {
     @Test func garbageInDefaultsIsIgnoredRatherThanCrashing() {
         #expect(Settings.decodeChain("claude,notAProvider,onDevice") == [.claude, .onDevice])
     }
+
+    @Test func duplicatedProviderOutputFallsThroughToTheNextStep() async {
+        let text = "can you send me the report by friday"
+        let cleaned = "Can you send me the report by Friday?"
+        let result = await CleanupChain.run(text, chain: [.local, .onDevice]) { _, step, _ in
+            step == .local ? "\(cleaned)\n\(cleaned)" : cleaned
+        }
+        #expect(result.usedStep == .onDevice)
+        #expect(result.failed == [.local])
+        #expect(result.text == cleaned)
+    }
 }

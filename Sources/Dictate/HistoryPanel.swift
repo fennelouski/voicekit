@@ -16,6 +16,10 @@ import Carbon.HIToolbox
 import SwiftUI
 import VoiceKit
 
+extension Notification.Name {
+    static let dictateShowRecovery = Notification.Name("DictateShowRecovery")
+    static let dictateOpenCleanupSettings = Notification.Name("DictateOpenCleanupSettings") }
+
 /// On-disk record of recent dictations and the cleanup stages behind each.
 @MainActor
 final class DictationHistory {
@@ -33,8 +37,9 @@ final class DictationHistory {
         /// Percent of words changed from the previous applied stage. Nil for the raw
         /// transcript (nothing precedes it) and for failed provider attempts (no output).
         let changePercent: Int?
+        var failure: CleanupFailure? = nil
 
-        private enum CodingKeys: String, CodingKey { case label, systemImage, text, status, changePercent }
+        private enum CodingKeys: String, CodingKey { case label, systemImage, text, status, changePercent, failure }
     }
 
     struct Entry: Codable, Identifiable {
@@ -66,7 +71,7 @@ final class DictationHistory {
            let decoded = try? JSONDecoder().decode([Entry].self, from: data) {
             entries = decoded
         }
-        prune()
+        if prune() { save() }
     }
 
     func add(_ entry: Entry) {
@@ -80,7 +85,7 @@ final class DictationHistory {
     /// Newest first. Prunes first so a shortened retention setting takes effect
     /// immediately, not just after the next dictation.
     func recent() -> [Entry] {
-        prune()
+        if prune() { save() }
         return entries.reversed()
     }
 
@@ -91,12 +96,15 @@ final class DictationHistory {
 
     /// Drops entries older than the configured retention window, then enforces the
     /// hard cap — which still applies even at "Forever", so history can't grow unbounded.
-    private func prune() {
+    @discardableResult
+    private func prune() -> Bool {
+        let before = entries.count
         if let days = Settings.dictationHistoryRetention.days {
             let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
             entries.removeAll { $0.date < cutoff }
         }
         if entries.count > cap { entries.removeFirst(entries.count - cap) }
+        return before != entries.count
     }
 
     private func save() {
@@ -337,6 +345,22 @@ private struct StageRow: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+                }
+                if let failure = stage.failure {
+                    Text(failure.message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Button("Open Settings") {
+                            UserDefaults.standard.set("cleanup", forKey: Settings.settingsPaneKey)
+                            NotificationCenter.default.post(name: .dictateOpenCleanupSettings, object: nil)
+                        }
+                        Button("Copy details") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString("\(stage.label): \(failure.rawValue)", forType: .string)
+                        }
+                    }
+                    .font(.caption)
                 }
                 if copyable {
                     Text(stage.text)

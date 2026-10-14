@@ -36,20 +36,27 @@ actor ConversationRecorder {
 
     private var pending: [Float] = []      // converted samples awaiting diarization
     private var processedSamples = 0       // diarization frontier, in absolute samples
+    private var cancelled = false
+    private var finished = false
+    private let loadModels: @Sendable () async throws -> DiarizerModels
+    private var modelTask: Task<Void, Never>?
     private var diarizer: DiarizerManager? // one instance per session → stable speaker IDs
     private var spans: [(speaker: Int, start: Double, end: Double)] = []
     private var speakerNumbers: [String: Int] = [:]  // FluidAudio speakerId → 1, 2, 3…
     private var lines: [Line] = []
 
-    init(directory: URL = LearningPaths.transcripts) {
+    init(directory: URL = LearningPaths.transcripts,
+         loadModels: @escaping @Sendable () async throws -> DiarizerModels = { try await DiarizerModels.downloadIfNeeded() }) {
+        self.loadModels = loadModels
         let dir = directory
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        fileURL = dir.appendingPathComponent("\(formatter.string(from: started)).md")
+        fileURL = dir.appendingPathComponent("\(formatter.string(from: started))-\(UUID().uuidString.prefix(8)).md")
     }
 
     func setMicrophone(_ description: String) {
+        guard !cancelled, !finished else { return }
         microphone = description
         write()
     }
@@ -58,12 +65,14 @@ actor ConversationRecorder {
     func run(buffers: AsyncStream<AVAudioPCMBuffer>) async {
         // Model download must NEVER block audio consumption or the stop flow:
         // it installs the diarizer whenever it finishes (instant after first run).
-        Task {
-            if let models = try? await DiarizerModels.downloadIfNeeded() {
+        guard !cancelled, !finished else { return }
+        modelTask = Task {
+            if let models = try? await loadModels(), !Task.isCancelled, !cancelled, !finished {
                 install(models)
             }
         }
         for await buffer in buffers {
+            guard !cancelled, !finished, !Task.isCancelled else { return }
             if let converted = try? converter.convertBuffer(buffer, to: format16k),
                let data = converted.floatChannelData {
                 pending.append(contentsOf: UnsafeBufferPointer(start: data[0], count: Int(converted.frameLength)))
@@ -83,13 +92,30 @@ actor ConversationRecorder {
     /// Record one finalized transcript segment. Text hits disk immediately;
     /// its speaker label fills in once diarization catches up.
     func addSegment(text: String, start: Double?, end: Double?) {
+        guard !cancelled, !finished else { return }
         let s = start ?? lines.last?.end ?? 0
         lines.append(Line(text: text, start: s, end: end ?? s, speaker: nil))
         assignAndWrite()
     }
 
+    /// Cancellation discards this session's transcript and prevents late model
+    /// download/finish callbacks from recreating it.
+    func cancel() {
+        cancelled = true
+        modelTask?.cancel()
+        modelTask = nil
+        pending = []
+        lines = []
+        diarizer = nil
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
     /// Diarize the remaining tail and settle every line's speaker.
     func finish() {
+        guard !cancelled, !finished else { return }
+        finished = true
+        modelTask?.cancel()
+        modelTask = nil
         stopped = Date()
         if !pending.isEmpty {
             diarizeChunk()
@@ -100,6 +126,8 @@ actor ConversationRecorder {
                 ?? (i > lines.startIndex ? lines[i - 1].speaker : nil)
         }
         write()
+        pending = []
+        diarizer = nil
     }
 
     private func diarizeChunk() {
@@ -145,6 +173,7 @@ actor ConversationRecorder {
     }
 
     private func write() {
+        guard !cancelled else { return }
         var rendered = "# Dictation — \(started.formatted(date: .abbreviated, time: .shortened))\n\n"
         for line in lines {
             let label = line.speaker.map { "Speaker \($0)" } ?? "Speaker ?"

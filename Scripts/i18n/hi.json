@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate आपकी आवाज़ सुनता है ताकि आप जो कहें उसे टाइप कर सके। ऑडियो कभी इस Mac को नहीं छोड़ता।",
-    "NSSpeechRecognitionUsageDescription": "Dictate आपके भाषण को डिवाइस पर प्रतिलेखित करता है। कोई ऑडियो या टेक्स्ट कहीं नहीं भेजा जाता।",
+    "NSSpeechRecognitionUsageDescription": "आप जो कहते हैं उसे टाइप करने के लिए आवाज़ का लिप्यंतरण डिवाइस पर होता है।",
     "NSAudioCaptureUsageDescription": "Dictate किसी दूसरे ऐप का ऑडियो केवल तभी कैप्चर करता है जब आप बातचीत रिकॉर्डिंग शुरू करते हैं। ऑडियो कभी इस Mac से बाहर नहीं जाता।"
   }
 }

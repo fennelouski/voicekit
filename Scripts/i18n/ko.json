@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate는 당신이 말하는 것을 입력하기 위해 당신의 목소리를 듣습니다. 오디오는 이 Mac을 절대 떠나지 않습니다.",
-    "NSSpeechRecognitionUsageDescription": "Dictate는 당신의 음성을 온디바이스에서 받아씁니다. 오디오나 텍스트는 어디에도 전송되지 않습니다.",
+    "NSSpeechRecognitionUsageDescription": "말한 내용을 입력하기 위해 기기에서 음성을 텍스트로 변환합니다.",
     "NSAudioCaptureUsageDescription": "Dictate는 사용자가 시작한 대화 녹음 중에만 다른 앱의 오디오를 캡처합니다. 오디오는 이 Mac을 벗어나지 않습니다."
   }
 }

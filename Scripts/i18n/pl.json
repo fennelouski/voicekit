@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate słucha Twojego głosu, aby pisać to, co mówisz. Dźwięk nigdy nie opuszcza tego Maca.",
-    "NSSpeechRecognitionUsageDescription": "Dictate transkrybuje Twoją mowę na urządzeniu. Żaden dźwięk ani tekst nie są nigdzie wysyłane.",
+    "NSSpeechRecognitionUsageDescription": "Mowa jest transkrybowana na urządzeniu, aby wpisać to, co mówisz.",
     "NSAudioCaptureUsageDescription": "Dictate przechwytuje dźwięk innej aplikacji tylko podczas nagrywania rozmowy rozpoczętego przez Ciebie. Dźwięk nigdy nie opuszcza tego Maca."
   }
 }

@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate sluša vaš glas da bi tipkao ono što govorite. Zvuk nikad ne napušta ovaj Mac.",
-    "NSSpeechRecognitionUsageDescription": "Dictate transkribira vaš govor na uređaju. Nikakav zvuk ni tekst ne šalju se nikamo.",
+    "NSSpeechRecognitionUsageDescription": "Govor se transkribira na uređaju kako bi se upisalo ono što kažete.",
     "NSAudioCaptureUsageDescription": "Dictate snima zvuk druge aplikacije samo tijekom snimanja razgovora koje sami pokrenete. Zvuk nikada ne napušta ovaj Mac."
   }
 }

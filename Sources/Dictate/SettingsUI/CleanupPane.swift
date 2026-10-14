@@ -217,11 +217,11 @@ private struct ProviderConfigSection: View {
 
     var body: some View {
         Section {
-            if provider.requiresKey {
-                SecureField("API key", text: $apiKey)
+            Group {
+                SecureField(provider.requiresKey ? String(localized: "API key") : String(localized: "API key (optional)"), text: $apiKey)
                     .onChange(of: apiKey) { _, newValue in
-                        KeychainStore.set(newValue, forKey: provider.keychainAccount)
-                        test = .idle
+                        test = KeychainStore.set(newValue, forKey: provider.keychainAccount)
+                            ? .idle : .failure(String(localized: "Could not save the API key in Keychain"))
                     }
 
                 if let keyURL = provider.keyURL {

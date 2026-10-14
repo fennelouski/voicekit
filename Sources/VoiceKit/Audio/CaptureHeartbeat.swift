@@ -17,12 +17,12 @@ import Foundation
 /// and read from whichever actor is supervising the session.
 final class CaptureHeartbeat: @unchecked Sendable {
     private let lock = NSLock()
-    private var last = Date.distantPast
+    private var last = -Double.infinity
 
     /// Call for every buffer the tap delivers.
     func beat() {
         lock.lock()
-        last = Date()
+        last = ProcessInfo.processInfo.systemUptime
         lock.unlock()
     }
 
@@ -36,6 +36,6 @@ final class CaptureHeartbeat: @unchecked Sendable {
     var silence: TimeInterval {
         lock.lock()
         defer { lock.unlock() }
-        return Date().timeIntervalSince(last)
+        return max(0, ProcessInfo.processInfo.systemUptime - last)
     }
 }

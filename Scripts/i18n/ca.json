@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "El Dictate escolta la teva veu per escriure el que dius. L'àudio mai no surt d'aquest Mac.",
-    "NSSpeechRecognitionUsageDescription": "El Dictate transcriu la teva parla al dispositiu. No s'envia cap àudio ni text enlloc.",
+    "NSSpeechRecognitionUsageDescription": "La parla es transcriu al dispositiu per escriure el que dius.",
     "NSAudioCaptureUsageDescription": "El Dictate només captura l'àudio d'una altra app durant un enregistrament de conversa que iniciïs tu. L'àudio no surt mai d'aquest Mac."
   }
 }

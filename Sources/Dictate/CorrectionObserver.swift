@@ -24,13 +24,19 @@ enum LearningPaths {
     static var log: URL { directory.appendingPathComponent("learning-log.jsonl") }
     static var transcripts: URL { directory.appendingPathComponent("Transcripts", isDirectory: true) }
     /// Scratch space for the in-flight dictation's audio. Files here are deleted as soon as
-    /// the dictation produces text; anything that outlives its session is pruned within a day.
+    /// the dictation produces text; interrupted/failed files move to explicit recovery.
     static var recovery: URL { directory.appendingPathComponent("Recovery", isDirectory: true) }
+    static var conversationScratch: URL { directory.appendingPathComponent("ConversationAudio", isDirectory: true) }
+    static var recoverable: URL { directory.appendingPathComponent("Recoverable", isDirectory: true) }
     static var history: URL { directory.appendingPathComponent("history.json") }
 }
 
 extension CorrectionStore {
     @MainActor static let shared = CorrectionStore(fileURL: LearningPaths.corrections)
+}
+
+extension VocabularyStore {
+    @MainActor static let shared = VocabularyStore(fileURL: LearningPaths.directory.appendingPathComponent("vocabulary.json"))
 }
 
 @MainActor
@@ -47,17 +53,25 @@ final class CorrectionObserver {
     private var store: CorrectionStore { .shared }
     private var pending: Pending?
     private var harvestTimer: Timer?
+    private var snapshotTask: Task<Void, Never>?
+    private var snapshotGeneration = UUID()
 
     /// Call right after inserting `text` into the frontmost app.
-    func beginObserving(inserted: String, rawLength: Int) {
+    func beginObserving(inserted: String, rawLength: Int, destination: InsertionDestination? = nil) {
         guard Settings.learningEnabled, !inserted.isEmpty else { return }
+        snapshotTask?.cancel()
+        snapshotGeneration = UUID()
+        let generation = snapshotGeneration
         harvest()
         let mode = Settings.cleanupMode.rawValue
         let app = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        Task { [weak self] in
+        snapshotTask = Task { [weak self] in
             // Let the paste land before snapshotting.
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            self?.snapshot(inserted: inserted, rawLength: rawLength, mode: mode, app: app)
+            do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            // A newer paste retires this snapshot, even in the same field.
+            guard let self, self.snapshotGeneration == generation, !Task.isCancelled,
+                  destination?.isCurrent ?? true else { return }
+            self.snapshot(inserted: inserted, rawLength: rawLength, mode: mode, app: app)
         }
     }
 
@@ -66,6 +80,7 @@ final class CorrectionObserver {
     func harvest() {
         harvestTimer?.invalidate()
         harvestTimer = nil
+        guard Settings.learningEnabled else { pending = nil; return }
         guard let pending else { return }
         self.pending = nil
         let after = Self.textValue(of: pending.element) ?? pending.before
@@ -78,6 +93,7 @@ final class CorrectionObserver {
     }
 
     private func snapshot(inserted: String, rawLength: Int, mode: String, app: String?) {
+        guard Settings.learningEnabled else { return }
         guard let element = Self.focusedElement(),
               let value = Self.textValue(of: element),
               value.contains(inserted) else {
@@ -106,8 +122,10 @@ final class CorrectionObserver {
     private static func textValue(of element: AXUIElement) -> String? {
         var roleRef: CFTypeRef?
         AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+        var subroleRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleRef)
         // Never read password fields.
-        if let role = roleRef as? String, role == "AXSecureTextField" { return nil }
+        if roleRef as? String == "AXSecureTextField" || subroleRef as? String == "AXSecureTextField" { return nil }
 
         var valueRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,

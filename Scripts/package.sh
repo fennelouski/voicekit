@@ -19,7 +19,7 @@ APP=build/Dictate.app
 DMG=build/Dictate.dmg
 
 # 1. Build the .app (release build + bundle assembly).
-Scripts/make-app.sh >/dev/null
+BUILD_CONFIGURATION=release Scripts/make-app.sh >/dev/null
 
 # 2. Re-sign for distribution: Developer ID + hardened runtime + entitlements + secure timestamp.
 #    The hardened runtime and timestamp are what notarization requires. Sparkle's embedded
@@ -28,6 +28,7 @@ Scripts/embed-sparkle.sh "$APP" "$IDENTITY" --options runtime --timestamp
 codesign --force --options runtime --timestamp \
     --entitlements Scripts/Dictate.entitlements \
     --sign "$IDENTITY" "$APP"
+Scripts/validate-app.sh "$APP"
 codesign --verify --strict --verbose=2 "$APP"
 
 # 3. Notarize the APP and staple its ticket, so the copy the user drags into /Applications

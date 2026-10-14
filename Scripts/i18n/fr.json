@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate écoute votre voix pour taper ce que vous dites. L'audio ne quitte jamais ce Mac.",
-    "NSSpeechRecognitionUsageDescription": "Dictate transcrit votre parole sur l'appareil. Aucun audio ni texte n'est envoyé où que ce soit.",
+    "NSSpeechRecognitionUsageDescription": "La parole est transcrite sur l’appareil pour saisir ce que vous dites.",
     "NSAudioCaptureUsageDescription": "Dictate ne capture l'audio d'une autre app que pendant un enregistrement de conversation que vous démarrez. L'audio ne quitte jamais ce Mac."
   }
 }

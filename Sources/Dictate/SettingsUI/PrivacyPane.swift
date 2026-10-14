@@ -39,8 +39,9 @@ struct PrivacyPane: View {
                         If you keep correcting "cloud code" to "Claude Code", it learns that and \
                         applies the correction itself next time.
 
-                        Everything stays on this Mac — the corrections are never uploaded, and they \
-                        apply no matter which cleanup mode you're using. Reset them any time below.
+                        Corrections are stored on this Mac and applied locally. If you configure a \
+                        cloud cleanup provider, learned spelling hints are also sent with the \
+                        transcript to help it preserve your terminology. Reset them any time below.
                         """),
                     value: $learningEnabled
                 ) { LearningDemo(enabled: $0) }
@@ -78,6 +79,11 @@ struct PrivacyPane: View {
                                 Text(String(format: String(localized: "%d manual · %d auto"), entry.manualCount, entry.autoCount))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
+                                Button("Remove", role: .destructive) {
+                                    CorrectionStore.shared.remove(entry.correction)
+                                    correctionHistory = CorrectionStore.shared.history()
+                                }
+                                .accessibilityLabel("Remove correction for \(entry.correction.heard)")
                             }
                         }
                         if correctionHistory.count > 20 {
@@ -110,7 +116,7 @@ struct PrivacyPane: View {
 
                         The transcript holds no audio, nothing is uploaded, and the speaker labels \
                         appear only in the file — they never show up in the text Dictate pastes \
-                        for you. On by default; turn it off and nothing is written at all.
+                        for you. On by default; turn it off to stop saving these transcript files.
                         """),
                     value: $conversationTranscripts
                 ) { TranscriptsDemo(enabled: $0) }
@@ -136,9 +142,10 @@ struct PrivacyPane: View {
                     .onChange(of: backupRecording) { _, on in
                         guard !on else { return }
                         BackupRecorder.sweep(LearningPaths.recovery, keeping: [])
+                        Task { await RecoveryStore.shared.clearDictations() }
                     }
 
-                Text("While you dictate, Dictate also records the audio to a file on this Mac. If recognition comes back with nothing — the microphone was unplugged, the recognizer stalled — it transcribes that file instead, so what you said isn't lost. The recording is deleted the moment your words are inserted, and a recording kept because it couldn't be transcribed lasts only until your next dictation finishes. By default there is never more than one, and it never leaves this Mac.")
+                Text("While you dictate, Dictate also records the audio to a file on this Mac. If recognition comes back with nothing — the microphone was unplugged, the recognizer stalled — it transcribes that file instead, so what you said isn't lost. The recording is deleted the moment your words are inserted, and a recording kept because it couldn't be transcribed lasts only until your next dictation finishes. Queued dictations keep their recovery files until processing finishes. Audio never leaves this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -163,10 +170,15 @@ struct PrivacyPane: View {
 
                     Button("Open Recovery Folder") {
                         try? FileManager.default.createDirectory(
-                            at: LearningPaths.recovery, withIntermediateDirectories: true
+                            at: LearningPaths.recoverable, withIntermediateDirectories: true
                         )
-                        NSWorkspace.shared.open(LearningPaths.recovery)
+                        NSWorkspace.shared.open(LearningPaths.recoverable)
                     }
+                }
+                Text("Recover Recordings offers local retry, audio export, and deletion. Failed conversation recordings stay until you delete them, separately from dictation retention.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Recover Recordings…") {
+                    NotificationCenter.default.post(name: .dictateShowRecovery, object: nil)
                 }
             } header: {
                 SettingsLabel(String(localized: "Recovery"), systemImage: "arrow.clockwise", tint: SettingsTint.privacy)

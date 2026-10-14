@@ -49,6 +49,7 @@ struct InputPane: View {
             } header: {
                 SettingsLabel(String(localized: "Language & Microphone"), systemImage: "mic", tint: SettingsTint.input)
             }
+            VocabularySection()
         }
         .formStyle(.grouped)
         .task {

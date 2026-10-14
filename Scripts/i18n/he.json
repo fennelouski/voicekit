@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate מאזין לקולך כדי להקליד את מה שאתה אומר. האודיו לעולם אינו עוזב את ה-Mac הזה.",
-    "NSSpeechRecognitionUsageDescription": "Dictate מתמלל את הדיבור שלך במכשיר. שום אודיו או טקסט אינם נשלחים לשום מקום.",
+    "NSSpeechRecognitionUsageDescription": "הדיבור מתומלל במכשיר כדי להקליד את מה שאתה אומר.",
     "NSAudioCaptureUsageDescription": "Dictate קולט שמע של יישום אחר רק במהלך הקלטת שיחה שאתה מתחיל. השמע לעולם לא עוזב את ה-Mac הזה."
   }
 }

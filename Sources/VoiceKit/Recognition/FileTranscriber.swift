@@ -18,6 +18,7 @@ public enum FileTranscriber {
     /// - Throws: `RecognitionError.notAuthorized`, `.localeNotSupported`,
     ///   `.modelDownloadFailed`, or file-reading errors.
     public static func transcribe(fileAt url: URL, locale: Locale? = nil) async throws -> [TranscriptionResult] {
+        try Task.checkCancellation()
         let status = SpeechRecognitionService.authorizationStatus()
         if status != .authorized {
             guard status == .notDetermined,
@@ -26,8 +27,10 @@ public enum FileTranscriber {
             }
         }
 
+        try Task.checkCancellation()
         let recognitionLocale = locale ?? Locale.current
         let supportedLocales = await SpeechTranscriber.supportedLocales
+        try Task.checkCancellation()
         guard supportedLocales.contains(where: {
             $0.language.languageCode == recognitionLocale.language.languageCode
         }) else {
@@ -38,11 +41,14 @@ public enum FileTranscriber {
         if let downloadRequest = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             do {
                 try await downloadRequest.downloadAndInstall()
+                try Task.checkCancellation()
             } catch {
+                if Task.isCancelled { throw CancellationError() }
                 throw RecognitionError.modelDownloadFailed(error)
             }
         }
 
+        try Task.checkCancellation()
         let analyzer = SpeechAnalyzer(modules: [transcriber])
 
         // Collect concurrently: results stream while the file is analyzed, and the
@@ -60,21 +66,31 @@ public enum FileTranscriber {
             return segments
         }
 
-        do {
-            let file = try AVAudioFile(forReading: url)
-            // Apple's file API: reads, converts, and paces the audio itself.
-            if let lastSample = try await analyzer.analyzeSequence(from: file) {
-                try await analyzer.finalizeAndFinish(through: lastSample)
-            } else {
-                try await analyzer.finalizeAndFinishThroughEndOfInput()
+        return try await withTaskCancellationHandler {
+            do {
+                try Task.checkCancellation()
+                let file = try AVAudioFile(forReading: url)
+                if let lastSample = try await analyzer.analyzeSequence(from: file) {
+                    try Task.checkCancellation()
+                    try await analyzer.finalizeAndFinish(through: lastSample)
+                } else {
+                    try Task.checkCancellation()
+                    try await analyzer.finalizeAndFinishThroughEndOfInput()
+                }
+                let segments = try await collector.value
+                try Task.checkCancellation()
+                return segments
+            } catch {
+                await analyzer.cancelAndFinishNow()
+                collector.cancel()
+                _ = try? await collector.value
+                throw error
             }
-        } catch {
-            await analyzer.cancelAndFinishNow()
+        } onCancel: {
             collector.cancel()
-            _ = try? await collector.value
-            throw error
+            // Interrupt analyzeSequence rather than merely ignoring its eventual
+            // result. The collector is unstructured and must be cancelled too.
+            Task { await analyzer.cancelAndFinishNow() }
         }
-
-        return try await collector.value
     }
 }

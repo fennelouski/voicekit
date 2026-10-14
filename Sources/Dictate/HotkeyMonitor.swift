@@ -76,6 +76,8 @@ final class HotkeyMonitor {
     var hotkey: Hotkey = .fn
     var onKeyDown: (() -> Void)?
     var onKeyUp: (() -> Void)?
+    var onEscape: (() -> Bool)?
+    private let escapeMonitor = EscapeMonitor()
 
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -83,6 +85,13 @@ final class HotkeyMonitor {
 
     func start() {
         stop()
+        escapeMonitor.onEscape = { [weak self] in
+            guard let self, self.onEscape?() == true else { return false }
+            // Swallow the release of a dictation key still held during Escape.
+            self.isDown = false
+            return true
+        }
+        escapeMonitor.start()
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event) }
         }
@@ -93,6 +102,7 @@ final class HotkeyMonitor {
     }
 
     func stop() {
+        escapeMonitor.stop()
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         globalMonitor = nil

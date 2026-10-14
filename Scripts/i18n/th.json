@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate ฟังเสียงของคุณเพื่อพิมพ์สิ่งที่คุณพูด เสียงจะไม่ออกจาก Mac เครื่องนี้เลย",
-    "NSSpeechRecognitionUsageDescription": "Dictate ถอดเสียงพูดของคุณบนอุปกรณ์ ไม่มีการส่งเสียงหรือข้อความไปที่ใด",
+    "NSSpeechRecognitionUsageDescription": "เสียงพูดจะถูกถอดเป็นข้อความบนอุปกรณ์เพื่อพิมพ์สิ่งที่คุณพูด",
     "NSAudioCaptureUsageDescription": "Dictate จะบันทึกเสียงของแอปอื่นเฉพาะระหว่างการบันทึกบทสนทนาที่คุณเริ่มเท่านั้น เสียงจะไม่ออกจาก Mac เครื่องนี้"
   }
 }

@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Το Dictate ακούει τη φωνή σας για να πληκτρολογεί ό,τι λέτε. Ο ήχος δεν φεύγει ποτέ από αυτό το Mac.",
-    "NSSpeechRecognitionUsageDescription": "Το Dictate μεταγράφει την ομιλία σας στη συσκευή. Δεν αποστέλλεται κανένας ήχος ή κείμενο πουθενά.",
+    "NSSpeechRecognitionUsageDescription": "Η ομιλία μεταγράφεται στη συσκευή για να πληκτρολογηθεί αυτό που λέτε.",
     "NSAudioCaptureUsageDescription": "Το Dictate καταγράφει τον ήχο άλλης εφαρμογής μόνο κατά τη διάρκεια μιας εγγραφής συνομιλίας που ξεκινάτε εσείς. Ο ήχος δεν φεύγει ποτέ από αυτό το Mac."
   }
 }

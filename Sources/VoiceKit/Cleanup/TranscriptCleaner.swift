@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import NaturalLanguage
 
 /// Cleans dictated transcripts: strips filler words ("um", "uh", ...),
 /// collapses whitespace, and re-capitalizes sentence starts exposed by a removal.
@@ -53,6 +54,7 @@ public enum TranscriptCleaner {
     /// Lenient toward real cleanups (which keep nearly every input word) and strict against
     /// replacements (a refusal or answer reuses few of them).
     public static func preservesWording(original: String, cleaned: String) -> Bool {
+        guard !duplicatesTranscript(original: original, cleaned: cleaned) else { return false }
         let cleanedWords = Set(wordBag(cleaned))
         guard !cleanedWords.isEmpty else { return false }
         // Cleanup trims filler and repairs punctuation; it never balloons the text. A refusal or
@@ -63,14 +65,50 @@ public enum TranscriptCleaner {
         return Double(shared) / Double(cleanedWords.count) >= 0.5
     }
 
+    /// A model can echo the entire cleanup twice and still pass a word-overlap
+    /// check. Reject an exact doubled answer unless the speaker also repeated it.
+    private static func duplicatesTranscript(original: String, cleaned: String) -> Bool {
+        let labels: Set<String> = ["cleaned transcript:", "**cleaned transcript:**", "**cleaned transcript**:"]
+        let content = cleaned.components(separatedBy: .newlines).filter {
+            !labels.contains($0.trimmingCharacters(in: .whitespaces).lowercased())
+        }.joined(separator: "\n")
+        let output = words(content)
+        guard output.count.isMultiple(of: 2), output.count >= 12 else { return false }
+        let half = output.count / 2
+        let copy = Array(output.prefix(half))
+        guard copy == Array(output.suffix(half)) else { return false }
+
+        // Adjacent stutters should not count as intentionally dictating it twice.
+        let input = words(original)
+        var counts: [String: Int] = [:]
+        for (index, word) in input.enumerated() where index == 0 || word != input[index - 1] {
+            counts[word, default: 0] += 1
+        }
+        var repeated = 0
+        for word in copy where counts[word, default: 0] >= 2 {
+            counts[word, default: 0] -= 2
+            repeated += 1
+        }
+        return repeated * 2 <= half
+    }
+
     /// Lowercased word tokens with apostrophes folded, so "What's" matches "whats".
     private static func wordBag(_ s: String) -> Set<String> {
-        Set(
-            s.lowercased()
-                .replacingOccurrences(of: "'", with: "")
-                .replacingOccurrences(of: "\u{2019}", with: "")
-                .components(separatedBy: CharacterSet.alphanumerics.inverted)
-                .filter { !$0.isEmpty }
-        )
+        Set(words(s))
+    }
+
+    private static func words(_ text: String) -> [String] {
+        let normalized = text.precomposedStringWithCompatibilityMapping.lowercased()
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "\u{2019}", with: "")
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = normalized
+        var result: [String] = []
+        tokenizer.enumerateTokens(in: normalized.startIndex..<normalized.endIndex) { range, _ in
+            let token = String(normalized[range])
+            if token.rangeOfCharacter(from: .alphanumerics) != nil { result.append(token) }
+            return true
+        }
+        return result
     }
 }

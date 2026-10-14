@@ -171,7 +171,7 @@ enum HUDSpeed: String, CaseIterable, Identifiable {
     }
 }
 
-enum CleanupMode: String, CaseIterable, Identifiable {
+enum CleanupMode: String, CaseIterable, Identifiable, Sendable {
     case off
     case onDevice
     case claude
@@ -398,6 +398,7 @@ enum Settings {
         raw.split(separator: ",")
             .compactMap { CleanupMode(rawValue: String($0)) }
             .filter { $0 != .off }
+            .reduce(into: []) { result, step in if !result.contains(step) { result.append(step) } }
     }
 
     /// Comma-separated raw values — one defaults key, and readable in `defaults read`.

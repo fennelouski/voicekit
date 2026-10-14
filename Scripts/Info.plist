@@ -79,7 +79,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Dictate transcribes your speech on-device. No audio or text is sent anywhere.</string>
+	<string>Speech is transcribed on-device to type what you say.</string>
 	<key>SUAutomaticallyUpdate</key>
 	<true/>
 	<key>SUEnableAutomaticChecks</key>

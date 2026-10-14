@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate lyssnar på din röst för att skriva det du säger. Ljud lämnar aldrig den här datorn.",
-    "NSSpeechRecognitionUsageDescription": "Dictate transkriberar ditt tal på enheten. Inget ljud eller text skickas någonstans.",
+    "NSSpeechRecognitionUsageDescription": "Tal transkriberas på enheten för att skriva det du säger.",
     "NSAudioCaptureUsageDescription": "Dictate spelar bara in ljudet från en annan app under en samtalsinspelning som du startar. Ljudet lämnar aldrig den här Macen."
   }
 }

@@ -13,6 +13,7 @@
 import CoreAudio
 import Foundation
 import os
+import VoiceKit
 
 @available(macOS 26.0, *)
 final class ProcessTapCapture {
@@ -35,7 +36,9 @@ final class ProcessTapCapture {
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
-    private var continuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
+    private var continuation: AsyncStream<CapturedAudioBuffer>.Continuation?
+    private let delivery = CaptureDeliveryClock()
+    var silenceDuration: TimeInterval { delivery.silence }
     private let queue = DispatchQueue(label: "com.dictate.processTap")
 
     /// The HAL object for a pid. Only processes currently doing audio I/O are registered
@@ -61,7 +64,7 @@ final class ProcessTapCapture {
 
     /// Start capturing the process's audio. Buffers arrive in the tap's native format;
     /// the caller converts. Call `stop()` to tear down.
-    func start(pid: pid_t) throws -> AsyncStream<AVAudioPCMBuffer> {
+    func start(pid: pid_t) throws -> AsyncStream<CapturedAudioBuffer> {
         guard let processObject = Self.processObject(forPID: pid) else {
             throw CaptureError.processNotFound
         }
@@ -106,13 +109,17 @@ final class ProcessTapCapture {
         }
         aggregateID = newAggregateID
 
-        let (stream, cont) = AsyncStream<AVAudioPCMBuffer>.makeStream()
+        let (stream, cont) = AsyncStream<CapturedAudioBuffer>.makeStream(bufferingPolicy: .bufferingNewest(64))
+        delivery.reset()
         continuation = cont
 
-        err = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { _, inInputData, _, _, _ in
+        let delivery = self.delivery
+        err = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { _, inInputData, inputTime, _, _ in
             // Copy out of the HAL's buffer — it owns this memory and reuses it immediately.
             if let copy = Self.copyBuffer(inInputData, format: format) {
-                cont.yield(copy)
+                delivery.beat()
+                let host = inputTime.pointee.mHostTime > 0 ? inputTime.pointee.mHostTime : mach_absolute_time()
+                if let captured = CapturedAudioBuffer.copy(copy, at: AVAudioTime(hostTime: host)) { cont.yield(captured) }
             }
         }
         guard err == noErr, procID != nil else {

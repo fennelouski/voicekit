@@ -25,7 +25,7 @@ struct ConversationPane: View {
             Section {
                 Toggle("Enable conversation recording", isOn: $enabled)
 
-                Text("Adds a Record Conversation command to the menu bar. Each input below is recorded as its own named speaker — one mic for you, one for the person next to you, an app for the far side of a call. When you stop, everything is transcribed on this Mac and merged into a single timestamped transcript in the Transcripts folder. Normal dictation is unchanged, and nothing is pasted anywhere.")
+                Text("Adds Record Conversation to the menu bar. Each input is labeled with its source name; an app or microphone can contain several voices. When you stop, audio is transcribed locally and merged into a timestamped document in the Transcripts folder. Nothing is pasted automatically.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -80,11 +80,11 @@ struct ConversationPane: View {
                         .fixedSize()
                     }
 
-                    Text("The first time an app's audio is captured, macOS asks for System Audio Recording permission. Audio stays on this Mac and is deleted as soon as the transcript is written; nothing is uploaded.")
+                    Text("The first app capture may require System Audio Recording permission. Audio stays on this Mac. Successful audio is deleted after its transcript saves; failed or interrupted audio stays in Recover Recordings until you delete it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } header: {
-                    SettingsLabel(String(localized: "Speakers"), systemImage: "person.wave.2", tint: SettingsTint.conversation)
+                    SettingsLabel(String(localized: "Audio Sources"), systemImage: "person.wave.2", tint: SettingsTint.conversation)
                 }
             }
         }

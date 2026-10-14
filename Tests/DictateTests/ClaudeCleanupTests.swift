@@ -8,6 +8,7 @@
 
 import Foundation
 import Testing
+import VoiceKit
 @testable import Dictate
 
 struct ClaudeCleanupTests {
@@ -32,7 +33,7 @@ struct ClaudeCleanupTests {
         let messages = body?["messages"] as? [[String: Any]]
         #expect(messages?.count == 1)
         #expect(messages?.first?["role"] as? String == "user")
-        #expect(messages?.first?["content"] as? String == "hello world")
+        #expect(messages?.first?["content"] as? String == CleanupPrompt.input("hello world"))
         #expect((body?["system"] as? String)?.contains("Reply with only the cleaned text") == true)
     }
 
@@ -87,6 +88,12 @@ struct ClaudeCleanupTests {
         #expect(throws: Error.self) {
             try ClaudeCleanup.parseResponse(Data("not json".utf8))
         }
+    }
+
+    @Test(arguments: ["max_tokens", "pause_turn", "tool_use"])
+    func incompleteResponsesFail(_ reason: String) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["content": [["type": "text", "text": "Partial transcript"]], "stop_reason": reason])
+        #expect(throws: ClaudeCleanupError.self) { try ClaudeCleanup.parseResponse(data) }
     }
 }
 

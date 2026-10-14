@@ -97,15 +97,24 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var privacyNote: String {
         switch self {
         case .local:
-            return String(localized: "Works with any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, MLX, vLLM. Everything stays on your machine; if the request fails, your transcript is inserted unchanged.")
+            return String(localized: "Works with any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, MLX, vLLM. Your transcript and learned correction hints are sent to the URL you configure. Use a server on this Mac to keep cleanup on-device. If the request fails, your transcript is inserted unchanged.")
         default:
-            return String(format: String(localized: "Your key is stored in the Keychain, never in preferences. Transcripts are sent to %@ to be cleaned; audio and transcription stay on this Mac. If the request fails, your transcript is inserted unchanged."), displayName)
+            return String(format: String(localized: "Your key is stored in the Keychain, never in preferences. Transcripts and learned correction hints are sent to %@ to be cleaned; audio and transcription stay on this Mac. If the request fails, your transcript is inserted unchanged."), displayName)
         }
     }
 }
 
 /// The single place that decides which client a provider needs.
 enum CleanupService {
+    @available(macOS 26.0, *)
+    static func clean(_ text: String, configuration: CleanupConfiguration, hints: [Correction] = []) async throws -> String {
+        switch configuration.step {
+        case .off: return text
+        case .onDevice: return try await AICleanup.clean(text, hints: hints, customInstructions: configuration.promptInstructions)
+        case .claude: return try await ClaudeCleanup.clean(text, configuration: configuration, hints: hints)
+        default: return try await OpenAICompatibleCleanup.clean(text, configuration: configuration, hints: hints)
+        }
+    }
     static func clean(_ text: String, provider: AIProvider, hints: [Correction] = []) async throws -> String {
         if provider.usesAnthropicAPI {
             return try await ClaudeCleanup.clean(text, hints: hints)

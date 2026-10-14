@@ -293,7 +293,7 @@
   },
   "InfoPlist": {
     "NSMicrophoneUsageDescription": "Dictate, söylediklerinizi yazmak için sesinizi dinler. Ses bu Mac’ten asla ayrılmaz.",
-    "NSSpeechRecognitionUsageDescription": "Dictate, konuşmanızı cihazda yazıya döker. Hiçbir ses veya metin hiçbir yere gönderilmez.",
+    "NSSpeechRecognitionUsageDescription": "Söylediklerinizi yazmak için konuşma cihazda metne dönüştürülür.",
     "NSAudioCaptureUsageDescription": "Dictate başka bir uygulamanın sesini yalnızca sizin başlattığınız bir konuşma kaydı sırasında yakalar. Ses bu Mac'ten asla çıkmaz."
   }
 }

@@ -104,154 +104,171 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         inputDeviceID: UInt32? = nil,
         backupDirectory: URL? = nil
     ) async throws -> RecognitionSession {
-        // Check authorization
-        let status = Self.authorizationStatus()
-        if status != .authorized {
-            if status == .notDetermined {
-                let newStatus = await Self.requestAuthorization()
-                if newStatus != .authorized {
+        do {
+            try Task.checkCancellation()
+            // Check authorization
+            let status = Self.authorizationStatus()
+            if status != .authorized {
+                if status == .notDetermined {
+                    let newStatus = await Self.requestAuthorization()
+                    try Task.checkCancellation()
+                    if newStatus != .authorized {
+                        throw RecognitionError.notAuthorized
+                    }
+                } else {
                     throw RecognitionError.notAuthorized
                 }
-            } else {
+            }
+
+            // Speech authorization and microphone permission are separate grants. Without this
+            // check a denied mic sails past the gate above and fails deep in the audio engine as
+            // an opaque OSStatus; catch it here so the caller can say "grant the mic" plainly.
+            // iOS-only: a keyboard extension can't prompt, so the container app grants it first.
+            #if os(iOS) || os(visionOS)
+            if AVAudioApplication.shared.recordPermission != .granted {
                 throw RecognitionError.notAuthorized
             }
-        }
-
-        // Speech authorization and microphone permission are separate grants. Without this
-        // check a denied mic sails past the gate above and fails deep in the audio engine as
-        // an opaque OSStatus; catch it here so the caller can say "grant the mic" plainly.
-        // iOS-only: a keyboard extension can't prompt, so the container app grants it first.
-        #if os(iOS) || os(visionOS)
-        if AVAudioApplication.shared.recordPermission != .granted {
-            throw RecognitionError.notAuthorized
-        }
-        #endif
-
-        // Determine locale
-        let recognitionLocale = locale ?? Locale.current
-
-        // Verify locale is supported
-        let supportedLocales = await SpeechTranscriber.supportedLocales
-        let localeSupported = supportedLocales.contains { supported in
-            supported.language.languageCode == recognitionLocale.language.languageCode
-        }
-        guard localeSupported else {
-            throw RecognitionError.localeNotSupported
-        }
-
-        // Create transcriber — progressiveTranscription preset for low-latency live transcription
-        let newTranscriber = SpeechTranscriber(
-            locale: recognitionLocale,
-            preset: .progressiveTranscription
-        )
-        transcriber = newTranscriber
-
-        // Ensure speech model is installed
-        if let downloadRequest = try await AssetInventory.assetInstallationRequest(supporting: [newTranscriber]) {
-            do {
-                try await downloadRequest.downloadAndInstall()
-            } catch {
-                throw RecognitionError.modelDownloadFailed(error)
-            }
-        }
-
-        // Create analyzer
-        let newAnalyzer = SpeechAnalyzer(modules: [newTranscriber])
-        analyzer = newAnalyzer
-
-        // Get optimal audio format for the transcriber
-        let optimalFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [newTranscriber])
-        analyzerFormat = optimalFormat
-        bufferConverter = BufferConverter()
-
-        // Configure audio session for recording (iOS/visionOS only; macOS handles this via AVAudioEngine).
-        // `.record`, not `.playAndRecord`: dictation never plays audio, and a keyboard extension's
-        // sandbox will refuse to activate a playback-capable session — that refusal is what surfaced
-        // as "Couldn't start dictation". The minimal category is also the one that's granted.
-        #if os(iOS) || os(visionOS)
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP])
-            try audioSession.setActive(true)
-        } catch {
-            throw RecognitionError.engineStartFailed(error)
-        }
-        #endif
-
-        // Create the input stream for feeding audio to the analyzer
-        let (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
-        inputContinuation = inputBuilder
-
-        // Start the analyzer with the input sequence
-        try await newAnalyzer.start(inputSequence: inputSequence)
-
-        // Set up level stream
-        let levelStream = AsyncStream<Float> { continuation in
-            self.levelContinuation = continuation
-        }
-
-        // Set up audio buffer stream (for camera recording mux)
-        // Consumers capture live audio; an absent/slow consumer must not retain the whole session.
-        let audioBufferStream = AsyncStream<AVAudioPCMBuffer>(bufferingPolicy: .bufferingNewest(32)) { continuation in
-            self.audioBufferContinuation = continuation
-        }
-        // Bound the unused stream while the user is prompting without recording.
-        let timestampedAudioStream = AsyncStream<CapturedAudioBuffer>(bufferingPolicy: .bufferingNewest(32)) { continuation in
-            self.timestampedAudioContinuation = continuation
-        }
-
-        // Set up transcript stream
-        let transcriptStream = AsyncStream<TranscriptionResult> { continuation in
-            self.transcriptContinuation = continuation
-        }
-
-        // Spawn task to consume transcriber results
-        let capturedTranscriptCont = transcriptContinuation
-        resultsTask = Task {
-            do {
-                for try await result in newTranscriber.results {
-                    let text = String(result.text.characters)
-                    let isFinal = result.isFinal
-                    guard !text.isEmpty else { continue }
-                    Self.logger.debug("segment: \"\(text, privacy: .private)\" isFinal: \(isFinal)")
-                    let range = result.range
-                    capturedTranscriptCont?.yield(TranscriptionResult(
-                        text: text, isFinal: isFinal,
-                        start: range.start.seconds.isFinite ? range.start.seconds : nil,
-                        end: range.end.seconds.isFinite ? range.end.seconds : nil))
-                }
-            } catch {
-                Self.logger.error("results stream error: \(error)")
-            }
-            capturedTranscriptCont?.finish()
-        }
-
-        // Keep a copy of the audio on disk when the caller asked for one, so a session that
-        // transcribes to nothing can still be salvaged.
-        if let backupDirectory {
-            backup = BackupRecorder(directory: backupDirectory)
-        }
-
-        // Start capturing. Everything above this point is the analyzer, which outlives any
-        // single microphone — see `restartCapture`.
-        requestedDeviceID = inputDeviceID
-        do {
-            try startCapture(deviceID: inputDeviceID)
-            sessionActive = true
-        } catch {
-            _ = backup?.finish()
-            backup = nil
-            #if os(iOS) || os(visionOS)
-            try? AVAudioSession.sharedInstance().setActive(false)
             #endif
+
+            // Determine locale
+            let recognitionLocale = locale ?? Locale.current
+
+            // Verify locale is supported
+            let supportedLocales = await SpeechTranscriber.supportedLocales
+            try Task.checkCancellation()
+            let localeSupported = supportedLocales.contains { supported in
+                supported.language.languageCode == recognitionLocale.language.languageCode
+            }
+            guard localeSupported else {
+                throw RecognitionError.localeNotSupported
+            }
+
+            // Create transcriber — progressiveTranscription preset for low-latency live transcription
+            let newTranscriber = SpeechTranscriber(
+                locale: recognitionLocale,
+                preset: .progressiveTranscription
+            )
+            transcriber = newTranscriber
+
+            // Ensure speech model is installed
+            if let downloadRequest = try await AssetInventory.assetInstallationRequest(supporting: [newTranscriber]) {
+                try Task.checkCancellation()
+                do {
+                    try await downloadRequest.downloadAndInstall()
+                    try Task.checkCancellation()
+                } catch {
+                    if Task.isCancelled { throw CancellationError() }
+                    throw RecognitionError.modelDownloadFailed(error)
+                }
+            }
+
+            try Task.checkCancellation()
+            // Create analyzer
+            let newAnalyzer = SpeechAnalyzer(modules: [newTranscriber])
+            analyzer = newAnalyzer
+
+            // Get optimal audio format for the transcriber
+            let optimalFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [newTranscriber])
+            try Task.checkCancellation()
+            analyzerFormat = optimalFormat
+            bufferConverter = BufferConverter()
+
+            // Configure audio session for recording (iOS/visionOS only; macOS handles this via AVAudioEngine).
+            // `.record`, not `.playAndRecord`: dictation never plays audio, and a keyboard extension's
+            // sandbox will refuse to activate a playback-capable session — that refusal is what surfaced
+            // as "Couldn't start dictation". The minimal category is also the one that's granted.
+            #if os(iOS) || os(visionOS)
+            let audioSession = AVAudioSession.sharedInstance()
+            do {
+                try audioSession.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP])
+                try audioSession.setActive(true)
+            } catch {
+                throw RecognitionError.engineStartFailed(error)
+            }
+            #endif
+
+            // Create the input stream for feeding audio to the analyzer
+            let (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
+            inputContinuation = inputBuilder
+
+            // Start the analyzer with the input sequence
+            try await newAnalyzer.start(inputSequence: inputSequence)
+
+            try Task.checkCancellation()
+            // Set up level stream
+            let levelStream = AsyncStream<Float> { continuation in
+                self.levelContinuation = continuation
+            }
+
+            // Set up audio buffer stream (for camera recording mux)
+            // Consumers capture live audio; an absent/slow consumer must not retain the whole session.
+            let audioBufferStream = AsyncStream<AVAudioPCMBuffer>(bufferingPolicy: .bufferingNewest(32)) { continuation in
+                self.audioBufferContinuation = continuation
+            }
+            // Bound the unused stream while the user is prompting without recording.
+            let timestampedAudioStream = AsyncStream<CapturedAudioBuffer>(bufferingPolicy: .bufferingNewest(32)) { continuation in
+                self.timestampedAudioContinuation = continuation
+            }
+
+            // Set up transcript stream
+            let transcriptStream = AsyncStream<TranscriptionResult> { continuation in
+                self.transcriptContinuation = continuation
+            }
+
+            // Spawn task to consume transcriber results
+            let capturedTranscriptCont = transcriptContinuation
+            resultsTask = Task {
+                do {
+                    for try await result in newTranscriber.results {
+                        let text = String(result.text.characters)
+                        let isFinal = result.isFinal
+                        guard !text.isEmpty else { continue }
+                        Self.logger.debug("segment: \"\(text, privacy: .private)\" isFinal: \(isFinal)")
+                        let range = result.range
+                        capturedTranscriptCont?.yield(TranscriptionResult(
+                            text: text, isFinal: isFinal,
+                            start: range.start.seconds.isFinite ? range.start.seconds : nil,
+                            end: range.end.seconds.isFinite ? range.end.seconds : nil))
+                    }
+                } catch {
+                    Self.logger.error("results stream error: \(error)")
+                }
+                capturedTranscriptCont?.finish()
+            }
+
+            // Keep a copy of the audio on disk when the caller asked for one, so a session that
+            // transcribes to nothing can still be salvaged.
+            if let backupDirectory {
+                backup = BackupRecorder(directory: backupDirectory)
+            }
+
+            try Task.checkCancellation()
+            // Start capturing. Everything above this point is the analyzer, which outlives any
+            // single microphone — see `restartCapture`.
+            requestedDeviceID = inputDeviceID
+            do {
+                try startCapture(deviceID: inputDeviceID)
+                sessionActive = true
+            } catch {
+                _ = backup?.finish()
+                backup = nil
+                #if os(iOS) || os(visionOS)
+                try? AVAudioSession.sharedInstance().setActive(false)
+                #endif
+                throw error
+            }
+
+            return RecognitionSession(
+                transcript: transcriptStream, level: levelStream,
+                audioBuffers: audioBufferStream, backupURL: backup?.url,
+                timestampedAudioBuffers: timestampedAudioStream
+            )
+        } catch {
+            // Failed or cancelled starts may already own an analyzer and streams.
+            let backupURL = await cancelRecognition()
+            if Task.isCancelled, let backupURL { try? FileManager.default.removeItem(at: backupURL) }
             throw error
         }
-
-        return RecognitionSession(
-            transcript: transcriptStream, level: levelStream,
-            audioBuffers: audioBufferStream, backupURL: backup?.url,
-            timestampedAudioBuffers: timestampedAudioStream
-        )
     }
 
     // MARK: - Capture
@@ -408,6 +425,24 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     ///   to be worth transcribing. The caller owns it, including deleting it.
     @discardableResult
     public func stopRecognition() async -> URL? {
+        let finishingAnalyzer = analyzer
+        return await withTaskCancellationHandler {
+            await endRecognition(discardingResults: false)
+        } onCancel: {
+            // Target the analyzer that was being finalized, never a replacement
+            // session that may start after this stop returns.
+            Task { await finishingAnalyzer?.cancelAndFinishNow() }
+        }
+    }
+
+    /// Stop capture immediately and discard pending analyzer results. The caller
+    /// still owns the returned recovery file and decides its deletion policy.
+    @discardableResult
+    public func cancelRecognition() async -> URL? {
+        await endRecognition(discardingResults: true)
+    }
+
+    private func endRecognition(discardingResults: Bool) async -> URL? {
         sessionActive = false
         teardownEngine()
         let backupURL = backup?.finish()
@@ -419,7 +454,12 @@ public actor SpeechRecognitionService: TranscriptionProvider {
 
         // Finalize the analyzer
         if let analyzer {
-            try? await analyzer.finalizeAndFinishThroughEndOfInput()
+            if discardingResults || Task.isCancelled {
+                resultsTask?.cancel()
+                await analyzer.cancelAndFinishNow()
+            } else {
+                try? await analyzer.finalizeAndFinishThroughEndOfInput()
+            }
         }
 
         // Drain remaining results so the last committed segment isn't dropped.

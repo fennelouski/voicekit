@@ -1,14 +1,5 @@
-//
-//  ConversationSessionController.swift
-//  Dictate
-//
-//  Runs a conversation recording session in two phases: while recording, each
-//  enabled source (mic or app tap) just captures raw audio to a temp file —
-//  no recognizers running. On stop, each file is transcribed sequentially
-//  on-device, merged by wall-clock time into one transcript document, and the
-//  audio is deleted. No HUD, no cleanup, no pasting.
-//
-
+// Conversation capture writes per-source segments. File-relative recognition
+// timestamps map through captured spans; failed audio is retained for recovery.
 #if os(macOS)
 @preconcurrency import AVFoundation
 import AppKit
@@ -20,285 +11,219 @@ import VoiceKit
 @available(macOS 26.0, *)
 @MainActor
 final class ConversationSessionController {
-    private static let log = Logger(subsystem: "Dictate", category: "ConversationSession")
-
-    enum State {
-        case idle
-        case recording
-        case transcribing
-    }
-
-    /// Reports state so the menu item and status icon can follow.
+    enum State { case idle, starting, recording, transcribing }
     var onStateChange: ((State) -> Void)?
+    var onRecoveryNeeded: (() -> Void)?
     private(set) var state: State = .idle
     var isRecording: Bool { state == .recording }
 
-    /// One source's capture in flight: where its audio lands and when it started.
     private final class SourceCapture {
         let source: ConversationSource
-        let url: URL
-        /// Wall-clock time of the first captured sample; segment time = anchor + offset.
-        var anchor: Date?
+        let index: Int
         var mic: MicRecorder?
         var tap: ProcessTapCapture?
         var task: Task<Void, Never>?
-
-        init(source: ConversationSource, url: URL) {
-            self.source = source
-            self.url = url
-        }
+        init(source: ConversationSource, index: Int) { self.source = source; self.index = index }
     }
-
     private var captures: [SourceCapture] = []
     private var events: [(date: Date, text: String)] = []
-    private var tempDir: URL?
-    private var sessionStarted = Date()
+    private var directory: URL?
+    private var manifest = ConversationScratchManifest(localeIdentifier: nil, segments: [])
+    private var started = Date()
+    private var generation = UUID()
 
     func toggle() {
         switch state {
         case .idle: start()
         case .recording: stop()
-        case .transcribing: break
+        case .starting, .transcribing: break
         }
     }
 
     private func start() {
         let sources = Settings.conversationSources.filter(\.enabled)
-        guard !sources.isEmpty else {
-            Self.log.error("no enabled conversation sources")
-            return
-        }
-        sessionStarted = Date()
-        events = []
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dictate-conversation-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        tempDir = dir
-        state = .recording
-        onStateChange?(.recording)
-
-        for (index, source) in sources.enumerated() {
-            let capture = SourceCapture(source: source, url: dir.appendingPathComponent("source-\(index).caf"))
-            captures.append(capture)
-            switch source.kind {
-            case .microphone:
-                startMicrophone(capture)
-            case .app:
-                capture.task = Task { await self.captureApp(capture) }
+        guard !sources.isEmpty else { return }
+        generation = UUID()
+        let run = generation
+        let locale = Settings.locale?.identifier
+        state = .starting
+        onStateChange?(.starting)
+        Task {
+            await RecoveryStore.shared.importConversationsOnce(from: LearningPaths.conversationScratch)
+            guard generation == run, state == .starting else { return }
+            let dir = LearningPaths.conversationScratch.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                await RecoveryStore.shared.protectConversation(dir)
+                directory = dir
+                manifest = ConversationScratchManifest(localeIdentifier: locale, segments: [])
+                try saveManifest()
+            } catch {
+                if let directory { await RecoveryStore.shared.releaseConversation(directory) }
+                self.directory = nil
+                state = .idle; onStateChange?(.idle); onRecoveryNeeded?(); return
+            }
+            started = Date()
+            events = []
+            state = .recording
+            onStateChange?(.recording)
+            for (index, source) in sources.enumerated() {
+                let capture = SourceCapture(source: source, index: index)
+                captures.append(capture)
+                capture.task = Task { await captureSource(capture, generation: run) }
             }
         }
     }
 
     private func stop() {
-        guard state == .recording else { return }
+        guard state == .recording, let directory else { return }
         state = .transcribing
         onStateChange?(.transcribing)
-
-        let finished = captures
-        let dir = tempDir
-        captures = []
-        tempDir = nil
-
+        let stopped = captures
         Task {
-            // End every capture: mic engines stop, tap streams finish (which ends the
-            // file writers), retry loops see the cancel.
-            for capture in finished {
-                capture.mic?.stop()
-                capture.tap?.stop()
-                capture.task?.cancel()
-            }
-            for capture in finished {
-                await capture.task?.value
-            }
-
-            var descriptions: [String] = []
-            for capture in finished {
-                descriptions.append(await describe(capture.source))
-            }
-            let recorder = MultiInputRecorder(sources: descriptions, started: sessionStarted)
-            for event in events {
-                await recorder.noteEvent(event.text, at: event.date)
-            }
-
-            // Sequential on purpose: one analyzer at a time, never N at once.
-            for capture in finished {
-                guard let anchor = capture.anchor,
-                      FileManager.default.fileExists(atPath: capture.url.path) else { continue }
-                do {
-                    let segments = try await FileTranscriber.transcribe(fileAt: capture.url, locale: Settings.locale)
-                    for segment in segments {
-                        await recorder.addSegment(
-                            speaker: capture.source.name,
-                            at: anchor.addingTimeInterval(segment.start ?? 0),
-                            text: segment.text
-                        )
-                    }
-                } catch {
-                    await recorder.noteEvent(
-                        "\(capture.source.name): transcription failed — \(error.localizedDescription)",
-                        at: Date()
-                    )
-                }
-            }
-
-            await recorder.finish()
-            // The whole point of recording was the transcript — hand it over instead of
-            // leaving it in a folder nobody can find.
-            NSWorkspace.shared.activateFileViewerSelecting([recorder.fileURL])
-            if let dir { try? FileManager.default.removeItem(at: dir) }
+            // Finish the streams before cancelling reconnect loops; writers drain
+            // their bounded queues so the final buffered audio is not thrown away.
+            for capture in stopped { capture.mic?.stop(); capture.tap?.stop(); capture.task?.cancel() }
+            for capture in stopped { await capture.task?.value }
+            let snapshot = manifest
+            let outcome = await ConversationFinalizer.finish(directory: directory, manifest: snapshot,
+                sources: stopped.map { "\($0.source.name) — \($0.source.reference)" }, started: started, events: events)
+            if let transcript = outcome.transcript { NSWorkspace.shared.activateFileViewerSelecting([transcript]) }
+            await RecoveryStore.shared.releaseConversation(directory)
+            self.directory = nil
+            captures = []
             state = .idle
             onStateChange?(.idle)
+            if outcome.retainedAudio { onRecoveryNeeded?() }
         }
     }
 
-    // MARK: - Capture
-
-    private func startMicrophone(_ capture: SourceCapture) {
-        guard let deviceID = AudioInputSelection.deviceID(forUID: capture.source.reference) else {
-            events.append((Date(), "\(capture.source.name): microphone not connected"))
-            return
-        }
-        let mic = MicRecorder(url: capture.url)
-        do {
-            try mic.start(deviceID: deviceID)
-            capture.mic = mic
-            capture.anchor = Date()
-        } catch {
-            events.append((Date(), "\(capture.source.name): capture failed — \(error.localizedDescription)"))
-        }
-    }
-
-    private func captureApp(_ capture: SourceCapture) async {
-        let tap = ProcessTapCapture()
-        capture.tap = tap
-
-        // The HAL only knows processes currently doing audio I/O, so keep trying —
-        // "start recording, then join the call" has to work.
-        var buffers: AsyncStream<AVAudioPCMBuffer>?
-        while !Task.isCancelled, buffers == nil {
-            if let pid = runningPID(bundleId: capture.source.reference),
-               ProcessTapCapture.processObject(forPID: pid) != nil {
-                do {
-                    buffers = try tap.start(pid: pid)
-                } catch ProcessTapCapture.CaptureError.processNotFound {
-                    // Audio stopped between the check and the tap; keep waiting.
-                } catch {
-                    events.append((Date(), "\(capture.source.name): capture failed — \(error.localizedDescription)"))
-                    return
+    private func captureSource(_ capture: SourceCapture, generation run: UUID) async {
+        var restarts = 0
+        while !Task.isCancelled, generation == run, state == .recording {
+            var stream: AsyncStream<CapturedAudioBuffer>?
+            do {
+                switch capture.source.kind {
+                case .microphone:
+                    guard let device = AudioInputSelection.deviceID(forUID: capture.source.reference) else {
+                        events.append((Date(), "\(capture.source.name): microphone disconnected")); return
+                    }
+                    let mic = MicRecorder()
+                    capture.mic = mic
+                    stream = try mic.start(deviceID: device)
+                case .app:
+                    while !Task.isCancelled, stream == nil, generation == run, state == .recording {
+                        if let pid = NSRunningApplication.runningApplications(withBundleIdentifier: capture.source.reference).first?.processIdentifier,
+                           ProcessTapCapture.processObject(forPID: pid) != nil {
+                            let tap = ProcessTapCapture()
+                            capture.tap = tap
+                            do { stream = try tap.start(pid: pid) }
+                            catch ProcessTapCapture.CaptureError.processNotFound {
+                                tap.stop(); capture.tap = nil
+                                try? await Task.sleep(for: .seconds(2))
+                            }
+                        } else { try? await Task.sleep(for: .seconds(2)) }
+                    }
+                }
+            } catch {
+                capture.mic?.stop(); capture.tap?.stop()
+                events.append((Date(), "\(capture.source.name): capture failed")); return
+            }
+            guard let stream, let directory, !Task.isCancelled, generation == run, state == .recording else {
+                capture.mic?.stop(); capture.tap?.stop(); return
+            }
+            let segment = ConversationAudioSegment(fileName: "source-\(capture.index)-\(UUID().uuidString).caf", source: capture.source.name)
+            manifest.segments.append(segment)
+            do { try saveManifest() }
+            catch {
+                // No journal means a crash would strand this recording. Stop
+                // before capturing audio which cannot be discovered later.
+                capture.mic?.stop(); capture.tap?.stop()
+                events.append((Date(), "\(capture.source.name): could not save the recovery journal")); return
+            }
+            let writer = ConversationAudioWriter(url: directory.appendingPathComponent(segment.fileName))
+            let writerTask = Task { @concurrent in
+                var failed = false
+                for await packet in stream {
+                    do { try await writer.append(packet) }
+                    catch { failed = true; break }
+                }
+                return (await writer.finish(), failed)
+            }
+            let watchdog = Task {
+                var previousTick = ProcessInfo.processInfo.systemUptime
+                var wakeUntil: TimeInterval = 0
+                while !Task.isCancelled, generation == run, state == .recording {
+                    try? await Task.sleep(for: .seconds(1))
+                    guard !Task.isCancelled else { return }
+                    let now = ProcessInfo.processInfo.systemUptime
+                    if now - previousTick > 5 { wakeUntil = now + 6 }
+                    previousTick = now
+                    if now < wakeUntil { continue }
+                    let silence = capture.mic?.silenceDuration ?? capture.tap?.silenceDuration ?? 0
+                    if silence > 6 { capture.mic?.stop(); capture.tap?.stop(); return }
                 }
             }
-            if buffers == nil {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                if Task.isCancelled { return }
+            let (timeline, failed) = await writerTask.value
+            watchdog.cancel()
+            capture.mic?.stop(); capture.tap?.stop()
+            capture.mic = nil; capture.tap = nil
+            if let index = manifest.segments.firstIndex(where: { $0.fileName == segment.fileName }) {
+                manifest.segments[index].timeline = timeline
+                try? saveManifest()
             }
+            if failed { events.append((Date(), "\(capture.source.name): audio write failed; captured audio retained")); return }
+            guard !Task.isCancelled, generation == run, state == .recording else { return }
+            restarts += 1
+            events.append((Date(), "\(capture.source.name): capture interrupted"))
+            guard restarts <= 3 else { events.append((Date(), "\(capture.source.name): reconnection limit reached")); return }
+            try? await Task.sleep(for: .seconds(1))
         }
-        guard let buffers else { return } // session stopped before the app played audio
-
-        // Write off the main actor; buffer cadence can be every few milliseconds.
-        let url = capture.url
-        let setAnchor: @Sendable @MainActor (Date) -> Void = { capture.anchor = $0 }
-        let writer = Task.detached {
-            var file: AVAudioFile?
-            // The tap's format is whatever the HAL declared, and `settings` doesn't carry
-            // interleaving — so a stereo mixdown tap hands AVAudioFile a layout its
-            // `processingFormat` doesn't expect, which is a *trap*, not an exception. Same
-            // conversion MicRecorder does below, for the same reason.
-            var fileFormat: AVAudioFormat?
-            let converter = BufferConverter()
-            for await buffer in buffers {
-                if file == nil {
-                    file = try? AVAudioFile(forWriting: url, settings: buffer.format.settings)
-                    fileFormat = file?.processingFormat
-                    await setAnchor(Date())
-                }
-                guard let file, let fileFormat,
-                      let converted = try? converter.convertBuffer(buffer, to: fileFormat) else { continue }
-                try? catchingObjCException { try? file.write(from: converted) }
-            }
-        }
-        await writer.value
     }
 
-    private func runningPID(bundleId: String) -> pid_t? {
-        NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first?.processIdentifier
-    }
-
-    /// Footer description: "Nathan — MacBook Pro Microphone" / "Call — zoom.us".
-    private func describe(_ source: ConversationSource) async -> String {
-        switch source.kind {
-        case .microphone:
-            if let id = AudioInputSelection.deviceID(forUID: source.reference),
-               let device = await AudioInputSelection.availableDevices().first(where: { $0.id == "\(id)" }) {
-                return "\(source.name) — \(device.name)"
-            }
-            return "\(source.name) — microphone"
-        case .app:
-            let app = NSRunningApplication.runningApplications(withBundleIdentifier: source.reference).first
-            return "\(source.name) — \(app?.localizedName ?? source.reference)"
-        }
+    private func saveManifest() throws {
+        guard let directory else { return }
+        try JSONEncoder().encode(manifest).write(to: directory.appendingPathComponent("session.json"), options: .atomic)
     }
 }
 
-/// Records one microphone to a file: its own engine, pinned to the device, tap
-/// writing straight to disk. Capture only — recognition happens after the fact.
 @available(macOS 26.0, *)
 private final class MicRecorder {
     private let engine = AVAudioEngine()
-    private let url: URL
+    private var continuation: AsyncStream<CapturedAudioBuffer>.Continuation?
     private var tapInstalled = false
+    private let delivery = CaptureDeliveryClock()
+    var silenceDuration: TimeInterval { delivery.silence }
 
-    init(url: URL) {
-        self.url = url
-    }
-
-    func start(deviceID: AudioDeviceID) throws {
-        let inputNode = engine.inputNode
-
-        // Pin the device BEFORE reading the format, same as SpeechRecognitionService —
-        // the tap format must match the device we'll actually capture from.
-        if let audioUnit = inputNode.audioUnit {
+    func start(deviceID: AudioDeviceID) throws -> AsyncStream<CapturedAudioBuffer> {
+        let input = engine.inputNode
+        if let unit = input.audioUnit {
             var id = deviceID
-            let err = AudioUnitSetProperty(
-                audioUnit,
-                kAudioOutputUnitProperty_CurrentDevice,
-                kAudioUnitScope_Global,
-                0,
-                &id,
-                UInt32(MemoryLayout<AudioDeviceID>.size)
-            )
-            if err != noErr {
-                throw NSError(domain: NSOSStatusErrorDomain, code: Int(err),
-                              userInfo: [NSLocalizedDescriptionKey: "Failed to set input device"])
+            let error = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                            &id, UInt32(MemoryLayout<AudioDeviceID>.size))
+            guard error == noErr else { throw RecognitionError.engineStartFailed(NSError(domain: NSOSStatusErrorDomain, code: Int(error))) }
+        }
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else { throw RecognitionError.recognitionUnavailable }
+        let (stream, continuation) = AsyncStream<CapturedAudioBuffer>.makeStream(bufferingPolicy: .bufferingNewest(64))
+        self.continuation = continuation
+        let delivery = self.delivery
+        delivery.reset()
+        do {
+            try input.installTapSafely(onBus: 0, bufferSize: 4096, format: format) { buffer, time in
+                delivery.beat()
+                if let packet = CapturedAudioBuffer.copy(buffer, at: time) { continuation.yield(packet) }
             }
-        }
-
-        let format = inputNode.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw NSError(domain: "MicRecorder", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Invalid audio format"])
-        }
-
-        let file = try AVAudioFile(forWriting: url, settings: format.settings)
-        // The tap may end up delivering a different format than the one we asked for (see
-        // `installTapSafely`), and a buffer AVAudioFile didn't expect is a *trap* — not an
-        // exception, so nothing can catch it. Converting to the file's own `processingFormat`
-        // (which is not the format it encodes to) is the only thing that makes this safe.
-        let fileFormat = file.processingFormat
-        let converter = BufferConverter()
-        try inputNode.installTapSafely(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
-            guard let converted = try? converter.convertBuffer(buffer, to: fileFormat) else { return }
-            try? catchingObjCException { try? file.write(from: converted) }
-        }
-        tapInstalled = true
-        try engine.start()
+            tapInstalled = true
+            try engine.start()
+        } catch { stop(); throw error }
+        return stream
     }
-
     func stop() {
         engine.stop()
-        if tapInstalled {
-            engine.inputNode.removeTapSafely(onBus: 0)
-            tapInstalled = false
-        }
+        if tapInstalled { engine.inputNode.removeTapSafely(onBus: 0); tapInstalled = false }
+        continuation?.finish()
+        continuation = nil
     }
 }
 #endif
