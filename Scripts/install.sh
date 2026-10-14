@@ -4,7 +4,7 @@
 #   • copies Dictate.app to /Applications  → Spotlight can find & launch it
 #   • installs a launchd LaunchAgent       → relaunches on crash, starts at login
 #
-# Usage: Scripts/install.sh
+# Usage: Scripts/install.sh [--prebuilt build/Dictate.app]
 # Uninstall: Scripts/install.sh uninstall
 #
 set -euo pipefail
@@ -35,10 +35,45 @@ if [ "${1:-}" = "uninstall" ]; then
     exit 0
 fi
 
-# Build the .app, then move it into /Applications so Spotlight indexes it.
-Scripts/make-app.sh
-rm -rf "$DEST"
-cp -R build/Dictate.app "$DEST"
+# Use the verified distribution bundle without rebuilding or replacing its signature.
+if [ "${1:-}" = "--prebuilt" ]; then
+    SOURCE="${2:-build/Dictate.app}"
+elif [ -z "${1:-}" ]; then
+    Scripts/make-app.sh
+    SOURCE=build/Dictate.app
+else
+    echo "Usage: Scripts/install.sh [--prebuilt build/Dictate.app]" >&2
+    exit 1
+fi
+Scripts/validate-app.sh "$SOURCE"
+INCOMING="/Applications/.Dictate-incoming-$$.app"
+ditto "$SOURCE" "$INCOMING"
+codesign --verify --deep --strict "$INCOMING"
+
+# Stop the registered job before changing the bundle; keep the previous app for rollback.
+unload
+for PID in $(pgrep -x Dictate || true); do
+    RUNNING=$(ps -p "$PID" -o comm= | sed 's/^ *//')
+    if [ "$RUNNING" = "$BIN" ]; then
+        kill -TERM "$PID"
+        for _ in $(seq 1 50); do
+            kill -0 "$PID" 2>/dev/null || break
+            sleep 0.1
+        done
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "Dictate has not stopped; the existing app is preserved." >&2
+            exit 1
+        fi
+    fi
+done
+if [ -d "$DEST" ]; then
+    OLD_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DEST/Contents/Info.plist")
+    BACKUP="build/installed-backups/Dictate-$OLD_VERSION-$(date -u +%Y%m%dT%H%M%SZ).app"
+    mkdir -p "$(dirname "$BACKUP")"
+    mv "$DEST" "$BACKUP"
+    echo "Previous app saved to $BACKUP"
+fi
+mv "$INCOMING" "$DEST"
 
 # KeepAlive.SuccessfulExit=false → relaunch only on a crash (non-zero exit).
 # A clean "Quit Dictate" exits 0 and stays quit. RunAtLoad starts it at login.
