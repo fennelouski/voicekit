@@ -299,7 +299,7 @@ private struct ProviderConfigSection: View {
             case .failure(let message):
                 Label(message, systemImage: "xmark.circle.fill")
                     .foregroundStyle(.red)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
