@@ -27,6 +27,8 @@ Requires macOS 26 to run and Xcode 26 to build. On first launch, grant **Accessi
 - Text insertion preserves the clipboard’s available formats and items, and never restores over a newer copy. Consecutive dictations add a separating space for spaced languages; Chinese and Japanese endings keep their natural spacing. The app, window, and text field are captured when dictation starts and checked before insertion. If focus changed or the target cannot be verified, text stays in history and on the clipboard for manual paste. Dictate never activates a different app to deliver a delayed result.
 - Settings: hotkey, language, microphone, cleanup chain, learning, dictation popup style, menu bar icon (optional — hotkeys work without it; reopen the app to get Settings back), launch at login.
 
+Ready-to-install macOS releases are [signed and notarized](https://github.com/fennelouski/voicekit/releases). [Download Dictate](https://nathanfennel.com/downloads/Dictate.dmg).
+
 ## Dictate — the iOS keyboard
 
 The same pipeline as a custom keyboard: tap the mic, talk, tap again. The transcript is
@@ -235,7 +237,7 @@ Your app must request microphone access:
 
 **macOS asks for permissions again after every rebuild.** Permission grants are tied to the app's code signature, and ad-hoc signatures change on every build. `Scripts/make-app.sh` signs with your Apple Development (or Developer ID) certificate when one is present, so grants survive rebuilds. If it prints `Signed ad-hoc (no Apple Development identity found)`, sign into Xcode → Settings → Accounts to get a free development certificate, then rebuild.
 
-**"Dictate.app can't be opened" (Gatekeeper).** Apps you build locally aren't quarantined and open normally. A pre-built copy from someone else isn't notarized: right-click the app → Open → Open to run it anyway.
+**"Dictate.app can't be opened" (Gatekeeper).** Official releases are signed and notarized. Download a fresh copy from the official release page if verification fails. Local builds use your available signing identity and require their own permission grants; they are not notarized unless you run the packaging workflow.
 
 **The hotkey does nothing.** The global key monitor needs Accessibility permission and only works after it's granted. If you granted it directly in System Settings (outside Dictate's onboarding), quit and relaunch Dictate.
 
