@@ -199,7 +199,7 @@ Forty locale bundles are structurally complete via English fallback. New/updated
 been fully translated: `Scripts/localize.py --check` currently reports **87 missing keys per
 non-English locale (3,132 locale-key instances)**. This is recorded translation work, not a passing
 translation audit. The speech-permission disclosure was corrected across the 33 source-language
-files; native review remains advisable. The canonical privacy policy changed; its website mirror
-still needs publication with the next website update.
+files; native review remains advisable. The canonical privacy policy and website mirror were published together with Dictate 1.5.0
+on October 26, 2026; see [deployment verification](releases/1.5.0-deployment.md).
 
 See [dictation latency](dictation-latency.md) for warm preparation, fast local defaults, and local measurement commands added October 15, 2026.

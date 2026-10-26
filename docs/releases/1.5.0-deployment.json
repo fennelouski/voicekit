@@ -1,0 +1,667 @@
+{
+  "version": "1.5.0",
+  "build": "12",
+  "deployedAt": "2026-10-26T18:33:21.062522+00:00",
+  "sourceCommit": "d3ba507d13e0878fe5d35b96d77d003fea365ce0",
+  "sourceTag": "v1.5.0",
+  "githubRelease": "https://github.com/fennelouski/voicekit/releases/tag/v1.5.0",
+  "download": "https://nathanfennel.com/downloads/Dictate.dmg",
+  "appcast": "https://nathanfennel.com/downloads/appcast.xml",
+  "privacy": "https://nathanfennel.com/dictate/privacy",
+  "notarization": {
+    "appSubmission": "3ec9a50a-8e48-4db1-bb4a-895e116cf9d0",
+    "dmgSubmission": "83327853-d58b-48b8-9b7f-7ddab735df48",
+    "appAndDmgGatekeeper": "accepted",
+    "status": "Accepted",
+    "appAndDmgTickets": "stapled and validated",
+    "hardenedRuntime": true,
+    "signingTeam": "EJLR2RPSV2"
+  },
+  "verification": {
+    "macOSExecuted": 261,
+    "macOSHardwareSkipped": 4,
+    "iOSExecuted": 7,
+    "pythonExecuted": 3,
+    "sparkleSignatures": "18 archive/delta signatures verified against the app public key",
+    "deltaFrom1.4.0": "applies successfully; resulting signed executable matches the full 1.5.0 app"
+  },
+  "websiteArtifactRevision": "4f3b10085c3af21f8dc5d584780899844347e38b",
+  "websiteWorkflowRevision": "7599e1066b32c90e8c13e34361c54f8f5f102bd4",
+  "websiteSourceBranch": "codex/dictate-1.5.0-native-release",
+  "hosting": {
+    "mode": "native-release-aws-origin-with-scoped-vercel-routing",
+    "status": "verified",
+    "version": "1.5.0",
+    "nativeRevision": "d3ba507d13e0878fe5d35b96d77d003fea365ce0",
+    "websiteRevision": "4f3b10085c3af21f8dc5d584780899844347e38b",
+    "productionBefore": {
+      "id": "dpl_2FJYiobbt2wRFU2GkHuvPjioZ3Gr",
+      "url": "nathanfennel-3mjt6cot6-nathan-fennels-projects.vercel.app",
+      "state": "READY",
+      "revision": "e96602bee0cdbf60d167fd2c8abbcf88ef613fa0"
+    },
+    "artifacts": [
+      {
+        "path": "downloads/Dictate.dmg",
+        "bytes": 6676765,
+        "sha256": "cac934ab4d041906d36e4cc4cd9661daf40310af2e152cc183e35985b989ab24",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate.dmg"
+      },
+      {
+        "path": "downloads/Dictate-1.3.4.zip",
+        "bytes": 5815240,
+        "sha256": "e13f20c283e014d8166e8130734e2d85ca7d49b03d20a49e541e1f8eed7d3f59",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.3.4.zip"
+      },
+      {
+        "path": "downloads/Dictate-1.4.0.html",
+        "bytes": 966,
+        "sha256": "af3065fef966398a18db95838dc3b7162f461e1160dd2cf8c052afeb9a3f941a",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.4.0.html"
+      },
+      {
+        "path": "downloads/Dictate-1.4.0.zip",
+        "bytes": 6114819,
+        "sha256": "286be8f764610ee847aef3107ddec704ad309d11a86774762e1e9f5ababf99ee",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.4.0.zip"
+      },
+      {
+        "path": "downloads/Dictate-1.5.0.html",
+        "bytes": 848,
+        "sha256": "c7cc537c2b1152b15ee8ec2c4b0e901e655ad07a247d70cddf9800284044d40a",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.5.0.html"
+      },
+      {
+        "path": "downloads/Dictate-1.5.0.zip",
+        "bytes": 6152257,
+        "sha256": "e445bd9ee580057402d4e408947bcea518d5f0b034157f42530e007ebe7568ea",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.5.0.zip"
+      },
+      {
+        "path": "downloads/Dictate10-5.delta",
+        "bytes": 543494,
+        "sha256": "23a1dd7fe61ca2a6e20e43cb100a7b2228ecf10d41b01dff315a1af703a0dd85",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-5.delta"
+      },
+      {
+        "path": "downloads/Dictate10-6.delta",
+        "bytes": 329090,
+        "sha256": "71f8b912c89d9acd6b0165d0464b18a2277647e521ab88b3f2d664b67d0534d0",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-6.delta"
+      },
+      {
+        "path": "downloads/Dictate10-7.delta",
+        "bytes": 305518,
+        "sha256": "cbf8f819bbf2092c0e6a55098409295cb9ef520b1b720c83450b8726f8930f54",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-7.delta"
+      },
+      {
+        "path": "downloads/Dictate10-8.delta",
+        "bytes": 294442,
+        "sha256": "343444c2366d6758825486f13ef063466e3637c8c77de285e23ca582455377a7",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-8.delta"
+      },
+      {
+        "path": "downloads/Dictate10-9.delta",
+        "bytes": 297934,
+        "sha256": "76b0e347ae3d98e7fc3c35460d9addcc4acd9e5b02359bcb9459cf1f53e197da",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-9.delta"
+      },
+      {
+        "path": "downloads/Dictate11-10.delta",
+        "bytes": 1689846,
+        "sha256": "da8027c2700144f3aacf5ff5821d29d52bbd403bb3ef8f007b7c9a0cf89638fc",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-10.delta"
+      },
+      {
+        "path": "downloads/Dictate11-6.delta",
+        "bytes": 1698238,
+        "sha256": "8bbe892313550e396093a1cc6ca039eebcd3b2a9da0b4132543fc9a1e5a7631a",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-6.delta"
+      },
+      {
+        "path": "downloads/Dictate11-7.delta",
+        "bytes": 1695858,
+        "sha256": "9eb134cdc661ed799d36f3afc28a73e18ccd77f457946b81c9f3014f45ae8632",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-7.delta"
+      },
+      {
+        "path": "downloads/Dictate11-8.delta",
+        "bytes": 1686454,
+        "sha256": "53a9c6ba6b0cd50898e8fd638f238f221591c85cbbbe40cf7645a50a209051bf",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-8.delta"
+      },
+      {
+        "path": "downloads/Dictate11-9.delta",
+        "bytes": 1702254,
+        "sha256": "1ac11db0b03694a19013e2b70e187fca6a1eaefabcf97732d5d552f61dc3156d",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-9.delta"
+      },
+      {
+        "path": "downloads/Dictate12-10.delta",
+        "bytes": 1729822,
+        "sha256": "8be7456f329cc1130f0f3a4e7de2583f824c59e89c60bc79150a75a68a2c635a",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-10.delta"
+      },
+      {
+        "path": "downloads/Dictate12-11.delta",
+        "bytes": 537494,
+        "sha256": "9c9d5f88ef0d4c2b71c7c47cf36ebabeaa31dc804dc87e1bdbff849deb1a100e",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-11.delta"
+      },
+      {
+        "path": "downloads/Dictate12-7.delta",
+        "bytes": 1730818,
+        "sha256": "5b8b30c5a37646e1d087ff89b8477b2456be9a9ccbaf3a88bd4d60bde02d3d2c",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-7.delta"
+      },
+      {
+        "path": "downloads/Dictate12-8.delta",
+        "bytes": 1734590,
+        "sha256": "bb298febe95c22028e6689c4d649e9c1962c5a8664238fc477d2b0c1cd32641c",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-8.delta"
+      },
+      {
+        "path": "downloads/Dictate12-9.delta",
+        "bytes": 1721254,
+        "sha256": "de52597b6c347049350b76ba97dea5841497210ce14a6c2c9c310e9f4bc45574",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-9.delta"
+      },
+      {
+        "path": "dictate/index.html",
+        "bytes": 7319,
+        "sha256": "140ddb024876686619b89bdfe17b471b6b3d2ededa6b5cb45efbed8722ecdcdd",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/dictate/index.html"
+      },
+      {
+        "path": "dictate/privacy.html",
+        "bytes": 11281,
+        "sha256": "287ba26dc9f991ae68ef377685824a318ff0bb8760b85dabedefdd0337571b08",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/dictate/privacy.html"
+      },
+      {
+        "path": "downloads/appcast.xml",
+        "bytes": 8162,
+        "sha256": "7af5750ab713b0fc84f1beb2e3c8261947faf1b3398b233faddc5a2a09799e63",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/appcast.xml"
+      },
+      {
+        "path": "downloads/dictate-release.json",
+        "bytes": 4548,
+        "sha256": "4cb8ce8f4b80c30fe83f2fc395537ace30fd07bfc05d10974e9deed031233f95",
+        "key": "native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/dictate-release.json"
+      }
+    ],
+    "checks": [
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate.dmg",
+        "status": 200,
+        "sha256": "cac934ab4d041906d36e4cc4cd9661daf40310af2e152cc183e35985b989ab24"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.3.4.zip",
+        "status": 200,
+        "sha256": "e13f20c283e014d8166e8130734e2d85ca7d49b03d20a49e541e1f8eed7d3f59"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.4.0.html",
+        "status": 200,
+        "sha256": "af3065fef966398a18db95838dc3b7162f461e1160dd2cf8c052afeb9a3f941a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.4.0.zip",
+        "status": 200,
+        "sha256": "286be8f764610ee847aef3107ddec704ad309d11a86774762e1e9f5ababf99ee"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.5.0.html",
+        "status": 200,
+        "sha256": "c7cc537c2b1152b15ee8ec2c4b0e901e655ad07a247d70cddf9800284044d40a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.5.0.zip",
+        "status": 200,
+        "sha256": "e445bd9ee580057402d4e408947bcea518d5f0b034157f42530e007ebe7568ea"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-5.delta",
+        "status": 200,
+        "sha256": "23a1dd7fe61ca2a6e20e43cb100a7b2228ecf10d41b01dff315a1af703a0dd85"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-6.delta",
+        "status": 200,
+        "sha256": "71f8b912c89d9acd6b0165d0464b18a2277647e521ab88b3f2d664b67d0534d0"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-7.delta",
+        "status": 200,
+        "sha256": "cbf8f819bbf2092c0e6a55098409295cb9ef520b1b720c83450b8726f8930f54"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-8.delta",
+        "status": 200,
+        "sha256": "343444c2366d6758825486f13ef063466e3637c8c77de285e23ca582455377a7"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-9.delta",
+        "status": 200,
+        "sha256": "76b0e347ae3d98e7fc3c35460d9addcc4acd9e5b02359bcb9459cf1f53e197da"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-10.delta",
+        "status": 200,
+        "sha256": "da8027c2700144f3aacf5ff5821d29d52bbd403bb3ef8f007b7c9a0cf89638fc"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-6.delta",
+        "status": 200,
+        "sha256": "8bbe892313550e396093a1cc6ca039eebcd3b2a9da0b4132543fc9a1e5a7631a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-7.delta",
+        "status": 200,
+        "sha256": "9eb134cdc661ed799d36f3afc28a73e18ccd77f457946b81c9f3014f45ae8632"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-8.delta",
+        "status": 200,
+        "sha256": "53a9c6ba6b0cd50898e8fd638f238f221591c85cbbbe40cf7645a50a209051bf"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-9.delta",
+        "status": 200,
+        "sha256": "1ac11db0b03694a19013e2b70e187fca6a1eaefabcf97732d5d552f61dc3156d"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-10.delta",
+        "status": 200,
+        "sha256": "8be7456f329cc1130f0f3a4e7de2583f824c59e89c60bc79150a75a68a2c635a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-11.delta",
+        "status": 200,
+        "sha256": "9c9d5f88ef0d4c2b71c7c47cf36ebabeaa31dc804dc87e1bdbff849deb1a100e"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-7.delta",
+        "status": 200,
+        "sha256": "5b8b30c5a37646e1d087ff89b8477b2456be9a9ccbaf3a88bd4d60bde02d3d2c"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-8.delta",
+        "status": 200,
+        "sha256": "bb298febe95c22028e6689c4d649e9c1962c5a8664238fc477d2b0c1cd32641c"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-9.delta",
+        "status": 200,
+        "sha256": "de52597b6c347049350b76ba97dea5841497210ce14a6c2c9c310e9f4bc45574"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/dictate/index.html",
+        "status": 200,
+        "sha256": "140ddb024876686619b89bdfe17b471b6b3d2ededa6b5cb45efbed8722ecdcdd"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/dictate/privacy.html",
+        "status": 200,
+        "sha256": "287ba26dc9f991ae68ef377685824a318ff0bb8760b85dabedefdd0337571b08"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/appcast.xml",
+        "status": 200,
+        "sha256": "7af5750ab713b0fc84f1beb2e3c8261947faf1b3398b233faddc5a2a09799e63"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/dictate-release.json",
+        "status": 200,
+        "sha256": "4cb8ce8f4b80c30fe83f2fc395537ace30fd07bfc05d10974e9deed031233f95"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate.dmg",
+        "status": 200,
+        "sha256": "cac934ab4d041906d36e4cc4cd9661daf40310af2e152cc183e35985b989ab24"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.3.4.zip",
+        "status": 200,
+        "sha256": "e13f20c283e014d8166e8130734e2d85ca7d49b03d20a49e541e1f8eed7d3f59"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.4.0.html",
+        "status": 200,
+        "sha256": "af3065fef966398a18db95838dc3b7162f461e1160dd2cf8c052afeb9a3f941a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.4.0.zip",
+        "status": 200,
+        "sha256": "286be8f764610ee847aef3107ddec704ad309d11a86774762e1e9f5ababf99ee"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.5.0.html",
+        "status": 200,
+        "sha256": "c7cc537c2b1152b15ee8ec2c4b0e901e655ad07a247d70cddf9800284044d40a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate-1.5.0.zip",
+        "status": 200,
+        "sha256": "e445bd9ee580057402d4e408947bcea518d5f0b034157f42530e007ebe7568ea"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-5.delta",
+        "status": 200,
+        "sha256": "23a1dd7fe61ca2a6e20e43cb100a7b2228ecf10d41b01dff315a1af703a0dd85"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-6.delta",
+        "status": 200,
+        "sha256": "71f8b912c89d9acd6b0165d0464b18a2277647e521ab88b3f2d664b67d0534d0"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-7.delta",
+        "status": 200,
+        "sha256": "cbf8f819bbf2092c0e6a55098409295cb9ef520b1b720c83450b8726f8930f54"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-8.delta",
+        "status": 200,
+        "sha256": "343444c2366d6758825486f13ef063466e3637c8c77de285e23ca582455377a7"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate10-9.delta",
+        "status": 200,
+        "sha256": "76b0e347ae3d98e7fc3c35460d9addcc4acd9e5b02359bcb9459cf1f53e197da"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-10.delta",
+        "status": 200,
+        "sha256": "da8027c2700144f3aacf5ff5821d29d52bbd403bb3ef8f007b7c9a0cf89638fc"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-6.delta",
+        "status": 200,
+        "sha256": "8bbe892313550e396093a1cc6ca039eebcd3b2a9da0b4132543fc9a1e5a7631a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-7.delta",
+        "status": 200,
+        "sha256": "9eb134cdc661ed799d36f3afc28a73e18ccd77f457946b81c9f3014f45ae8632"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-8.delta",
+        "status": 200,
+        "sha256": "53a9c6ba6b0cd50898e8fd638f238f221591c85cbbbe40cf7645a50a209051bf"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate11-9.delta",
+        "status": 200,
+        "sha256": "1ac11db0b03694a19013e2b70e187fca6a1eaefabcf97732d5d552f61dc3156d"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-10.delta",
+        "status": 200,
+        "sha256": "8be7456f329cc1130f0f3a4e7de2583f824c59e89c60bc79150a75a68a2c635a"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-11.delta",
+        "status": 200,
+        "sha256": "9c9d5f88ef0d4c2b71c7c47cf36ebabeaa31dc804dc87e1bdbff849deb1a100e"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-7.delta",
+        "status": 200,
+        "sha256": "5b8b30c5a37646e1d087ff89b8477b2456be9a9ccbaf3a88bd4d60bde02d3d2c"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-8.delta",
+        "status": 200,
+        "sha256": "bb298febe95c22028e6689c4d649e9c1962c5a8664238fc477d2b0c1cd32641c"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/Dictate12-9.delta",
+        "status": 200,
+        "sha256": "de52597b6c347049350b76ba97dea5841497210ce14a6c2c9c310e9f4bc45574"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/dictate/index.html",
+        "status": 200,
+        "sha256": "140ddb024876686619b89bdfe17b471b6b3d2ededa6b5cb45efbed8722ecdcdd"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/dictate/privacy.html",
+        "status": 200,
+        "sha256": "287ba26dc9f991ae68ef377685824a318ff0bb8760b85dabedefdd0337571b08"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/appcast.xml",
+        "status": 200,
+        "sha256": "7af5750ab713b0fc84f1beb2e3c8261947faf1b3398b233faddc5a2a09799e63"
+      },
+      {
+        "url": "https://nfbucketforstuff.s3.us-west-2.amazonaws.com/native-releases/dictate/releases/1.5.0/4f3b10085c3af21f8dc5d584780899844347e38b/downloads/dictate-release.json",
+        "status": 200,
+        "sha256": "4cb8ce8f4b80c30fe83f2fc395537ace30fd07bfc05d10974e9deed031233f95"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate.dmg",
+        "status": 200,
+        "sha256": "cac934ab4d041906d36e4cc4cd9661daf40310af2e152cc183e35985b989ab24"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate-1.3.4.zip",
+        "status": 200,
+        "sha256": "e13f20c283e014d8166e8130734e2d85ca7d49b03d20a49e541e1f8eed7d3f59"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate-1.4.0.html",
+        "status": 200,
+        "sha256": "af3065fef966398a18db95838dc3b7162f461e1160dd2cf8c052afeb9a3f941a"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate-1.4.0.zip",
+        "status": 200,
+        "sha256": "286be8f764610ee847aef3107ddec704ad309d11a86774762e1e9f5ababf99ee"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate-1.5.0.html",
+        "status": 200,
+        "sha256": "c7cc537c2b1152b15ee8ec2c4b0e901e655ad07a247d70cddf9800284044d40a"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate-1.5.0.zip",
+        "status": 200,
+        "sha256": "e445bd9ee580057402d4e408947bcea518d5f0b034157f42530e007ebe7568ea"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate10-5.delta",
+        "status": 200,
+        "sha256": "23a1dd7fe61ca2a6e20e43cb100a7b2228ecf10d41b01dff315a1af703a0dd85"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate10-6.delta",
+        "status": 200,
+        "sha256": "71f8b912c89d9acd6b0165d0464b18a2277647e521ab88b3f2d664b67d0534d0"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate10-7.delta",
+        "status": 200,
+        "sha256": "cbf8f819bbf2092c0e6a55098409295cb9ef520b1b720c83450b8726f8930f54"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate10-8.delta",
+        "status": 200,
+        "sha256": "343444c2366d6758825486f13ef063466e3637c8c77de285e23ca582455377a7"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate10-9.delta",
+        "status": 200,
+        "sha256": "76b0e347ae3d98e7fc3c35460d9addcc4acd9e5b02359bcb9459cf1f53e197da"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate11-10.delta",
+        "status": 200,
+        "sha256": "da8027c2700144f3aacf5ff5821d29d52bbd403bb3ef8f007b7c9a0cf89638fc"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate11-6.delta",
+        "status": 200,
+        "sha256": "8bbe892313550e396093a1cc6ca039eebcd3b2a9da0b4132543fc9a1e5a7631a"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate11-7.delta",
+        "status": 200,
+        "sha256": "9eb134cdc661ed799d36f3afc28a73e18ccd77f457946b81c9f3014f45ae8632"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate11-8.delta",
+        "status": 200,
+        "sha256": "53a9c6ba6b0cd50898e8fd638f238f221591c85cbbbe40cf7645a50a209051bf"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate11-9.delta",
+        "status": 200,
+        "sha256": "1ac11db0b03694a19013e2b70e187fca6a1eaefabcf97732d5d552f61dc3156d"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate12-10.delta",
+        "status": 200,
+        "sha256": "8be7456f329cc1130f0f3a4e7de2583f824c59e89c60bc79150a75a68a2c635a"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate12-11.delta",
+        "status": 200,
+        "sha256": "9c9d5f88ef0d4c2b71c7c47cf36ebabeaa31dc804dc87e1bdbff849deb1a100e"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate12-7.delta",
+        "status": 200,
+        "sha256": "5b8b30c5a37646e1d087ff89b8477b2456be9a9ccbaf3a88bd4d60bde02d3d2c"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate12-8.delta",
+        "status": 200,
+        "sha256": "bb298febe95c22028e6689c4d649e9c1962c5a8664238fc477d2b0c1cd32641c"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate12-9.delta",
+        "status": 200,
+        "sha256": "de52597b6c347049350b76ba97dea5841497210ce14a6c2c9c310e9f4bc45574"
+      },
+      {
+        "url": "https://nathanfennel.com/dictate/index.html",
+        "status": 200,
+        "sha256": "140ddb024876686619b89bdfe17b471b6b3d2ededa6b5cb45efbed8722ecdcdd"
+      },
+      {
+        "url": "https://nathanfennel.com/dictate/privacy.html",
+        "status": 200,
+        "sha256": "287ba26dc9f991ae68ef377685824a318ff0bb8760b85dabedefdd0337571b08"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/appcast.xml",
+        "status": 200,
+        "sha256": "7af5750ab713b0fc84f1beb2e3c8261947faf1b3398b233faddc5a2a09799e63"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/dictate-release.json",
+        "status": 200,
+        "sha256": "4cb8ce8f4b80c30fe83f2fc395537ace30fd07bfc05d10974e9deed031233f95"
+      },
+      {
+        "url": "https://nathanfennel.com/dictate",
+        "status": 200,
+        "sha256": "140ddb024876686619b89bdfe17b471b6b3d2ededa6b5cb45efbed8722ecdcdd"
+      },
+      {
+        "url": "https://nathanfennel.com/dictate/privacy",
+        "status": 200,
+        "sha256": "287ba26dc9f991ae68ef377685824a318ff0bb8760b85dabedefdd0337571b08"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/appcast.xml",
+        "status": 200,
+        "sha256": "7af5750ab713b0fc84f1beb2e3c8261947faf1b3398b233faddc5a2a09799e63"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate.dmg",
+        "status": 200,
+        "sha256": "cac934ab4d041906d36e4cc4cd9661daf40310af2e152cc183e35985b989ab24"
+      },
+      {
+        "url": "https://nathanfennel.com/downloads/Dictate-1.2.1.zip",
+        "status": 200,
+        "sha256": "bb8c4569a418b0cc96c1b41dd049cdeaf3bd8b1321681a11321501b7b06b289e"
+      }
+    ],
+    "fullWebsiteMigration": "incomplete; live website preserved; native releases are outside migration scope",
+    "DNSOrJobsChanged": false,
+    "cutoverCompletedAt": null,
+    "verifiedAt": "2026-10-26T18:29:15.551405+00:00",
+    "productionAfter": {
+      "id": "dpl_2FJYiobbt2wRFU2GkHuvPjioZ3Gr",
+      "url": "nathanfennel-3mjt6cot6-nathan-fennels-projects.vercel.app",
+      "state": "READY",
+      "revision": "e96602bee0cdbf60d167fd2c8abbcf88ef613fa0"
+    },
+    "routing": {
+      "version": "23e182b3-1444-4801-a193-122f28a0c065",
+      "initialVersion": "4a670d67-a4ef-4552-9211-caa55303ea3a",
+      "priorVersion": null,
+      "routes": [
+        {
+          "id": "d4901c98-29d6-4c9f-b01b-fd9699f59803",
+          "name": "Dictate native downloads"
+        },
+        {
+          "id": "fb99d9c7-acad-4fa9-aa64-101e836f8988",
+          "name": "Dictate native product page"
+        },
+        {
+          "id": "8a83a244-57ca-4ca1-adfd-3b7eb3f7dddf",
+          "name": "Dictate native privacy page"
+        }
+      ],
+      "scope": "exact published filenames and two native product/privacy pages; other archives and routes preserved"
+    },
+    "stagedChecks": [
+      {
+        "url": "https://nathanfennel-com-510cce-routes-nathan-fennels-projects.vercel.app/downloads/Dictate.dmg",
+        "sha256": "cac934ab4d041906d36e4cc4cd9661daf40310af2e152cc183e35985b989ab24",
+        "status": 200
+      },
+      {
+        "url": "https://nathanfennel-com-510cce-routes-nathan-fennels-projects.vercel.app/dictate",
+        "sha256": "140ddb024876686619b89bdfe17b471b6b3d2ededa6b5cb45efbed8722ecdcdd",
+        "status": 200
+      },
+      {
+        "url": "https://nathanfennel-com-510cce-routes-nathan-fennels-projects.vercel.app/dictate/privacy",
+        "sha256": "287ba26dc9f991ae68ef377685824a318ff0bb8760b85dabedefdd0337571b08",
+        "status": 200
+      },
+      {
+        "url": "https://nathanfennel-com-510cce-routes-nathan-fennels-projects.vercel.app/downloads/appcast.xml",
+        "sha256": "7af5750ab713b0fc84f1beb2e3c8261947faf1b3398b233faddc5a2a09799e63",
+        "status": 200
+      }
+    ]
+  },
+  "githubDownloads": "DMG and ZIP downloaded from the published release; SHA256SUMS matched",
+  "diskImage": "Mounted read-only; enclosed app signature and executable hash verified",
+  "installed": {
+    "path": "/Applications/Dictate.app",
+    "version": "1.5.0",
+    "build": "12",
+    "running": true,
+    "previousVersion": "1.4.0",
+    "rollbackBackup": "build/installed-backups/Dictate-1.4.0-20261026T182746Z.app",
+    "executableSHA256": "ebb795b192985dd715228d027d4bfac3df36c15d7b2340dd42d5644bd87b3d3b"
+  },
+  "limitations": {
+    "hardware": "Four microphone/ASR integration tests explicitly skipped; no real speech accuracy or microphone-to-editor speedup claim.",
+    "editor": "Keyboard event posting is not third-party editor acknowledgement.",
+    "localization": "New UI strings retain documented English fallbacks; native translation review remains pending.",
+    "website": "Full website AWS migration is incomplete; original production deployment and DNS/job ownership preserved."
+  }
+}

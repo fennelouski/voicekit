@@ -1,7 +1,8 @@
 # Dictation latency
 
-Implemented October 15, 2026. These are code changes and measurement tools, not a measured
-microphone-to-editor speedup claim. The installed 1.4.0 release does not contain these changes.
+Implemented October 15, 2026 and shipped in Dictate 1.5.0 on October 26, 2026. These are
+code changes and measurement tools, not a measured microphone-to-editor speedup claim. See
+[deployment verification](releases/1.5.0-deployment.md) for public availability and signed-update checks.
 
 ## Default path
 
@@ -98,4 +99,4 @@ API references: [SpeechAnalyzer preparation and retention](https://developer.app
 - Timing report: three parser/percentile/outcome tests passed, including duplicate events and cancelled/manual-copy exclusion. An empty report exits 2.
 - Development app bundle built and passed structure, signature, permission, notice, and 40-locale checks.
 - The isolated cleanup preview verified the default-off toggle, two-second budget, preserved provider chain, and return to local insertion. It did not start recording or replace the installed app.
-- Timing events from simulated transaction tests were read from unified logging. The production-process query returned no live samples, as expected with the unchanged installed release. No hardware speedup or editor delivery acknowledgement has been measured.
+- Timing events from simulated transaction tests were read from unified logging. Before the 1.5.0 release, the production-process query returned no live samples while the installed app was still 1.4.0. No hardware speedup or editor delivery acknowledgement has been measured.
