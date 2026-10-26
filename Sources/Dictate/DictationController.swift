@@ -31,11 +31,14 @@ final class DictationController {
     private let recordCompleted: @MainActor () -> Void
     private let recoveryStore: RecoveryStore?
     private let sweepRecovery: @MainActor ([URL]) -> Void
+    private let timingSink: @MainActor (DictationTiming.Event) -> Void
+    private var sessionMetrics: RecognitionMetrics?
     private var activeTransaction: DictationTransaction?
     private var activeOptions: DictationOptions?
     private var transactions: [UUID: DictationTransaction] = [:]
 
     init(
+        timingSink: @escaping @MainActor (DictationTiming.Event) -> Void = DictationTiming.logEvent,
         service: (any DictationRecognition)? = nil, hud: (any DictationHUD)? = nil,
         captureOptions: @escaping @MainActor () -> DictationOptions = { .current },
         captureDestination: @escaping @MainActor () -> InsertionDestination? = { InsertionDestination.capture() },
@@ -50,7 +53,8 @@ final class DictationController {
             BackupRecorder.sweep(LearningPaths.recovery, keeping: $0, retention: Settings.backupRetention.duration)
         }
     ) {
-        self.service = service ?? SpeechRecognitionService()
+        self.timingSink = timingSink
+        self.service = service ?? SpeechRecognitionService(captureWhilePreparing: true)
         self.hud = hud ?? HUDController()
         self.captureOptions = captureOptions
         self.captureDestination = captureDestination
@@ -62,6 +66,14 @@ final class DictationController {
         self.recordCompleted = recordCompleted
         self.sweepRecovery = sweepRecovery
         self.recoveryStore = recoveryStore
+    }
+
+    /// No microphone and no permission prompts. Idle preparation also runs after
+    /// each stop, so the next hotkey consumes an already prepared analyzer.
+    func prepareRecognition() {
+        guard !isCapturing else { return }
+        let locale = Settings.locale
+        Task { await service.prepareRecognition(locale: locale) }
     }
 
     var hasCancellableWork: Bool { transactions.values.contains { !$0.isCancelled } }
@@ -103,8 +115,8 @@ final class DictationController {
     private var activeBackupURL: URL?
 
     /// How long the microphone may go without delivering a buffer before we assume the
-    /// audio path is dead rather than the room quiet. Buffers arrive every ~90ms at the
-    /// sizes we ask for, so this is generous by two orders of magnitude.
+    /// audio path is dead rather than the room quiet. We request 1024-frame buffers (~21ms at 48kHz),
+    /// though the hardware may deliver a different size, so this is generous by two orders of magnitude.
     private let captureStallThreshold: TimeInterval = 2.5
 
     private var isStarting = false
@@ -164,8 +176,11 @@ final class DictationController {
     // MARK: - Session lifecycle
 
     private func start() {
-        let transaction = DictationTransaction(destination: captureDestination())
+        let requestedAt = ProcessInfo.processInfo.systemUptime
+        let transaction = DictationTransaction(destination: captureDestination(), requestedAt: requestedAt, timingSink: timingSink)
+        transaction.timing.mark("destination_captured")
         let options = captureOptions()
+        transaction.timing.mark("options_captured")
         activeTransaction = transaction
         activeOptions = options
         transactions[transaction.id] = transaction
@@ -174,6 +189,11 @@ final class DictationController {
         pendingStop = false
         accumulator.reset()
         hud.show()
+        if runStep == nil, options.chain.contains(.onDevice), let config = options.cleanupConfigurations[.onDevice] {
+            let polisher = AICleanup.PreparedSession(customInstructions: config.promptInstructions)
+            transaction.polisher = polisher
+            Task { await polisher.prewarm() }
+        }
 
         transaction.task = Task { [self] in
             do {
@@ -186,6 +206,8 @@ final class DictationController {
                     locale: options.locale, inputDeviceID: options.inputDeviceID,
                     backupDirectory: options.backupDirectory
                 )
+                sessionMetrics = session.metrics
+                transaction.timing.mark("capture_started")
                 activeBackupURL = session.backupURL
                 try transaction.checkCancellation()
 
@@ -235,6 +257,7 @@ final class DictationController {
                 activeOptions = nil
                 isStarting = false
                 isStopping = false
+                transaction.timing.mark(transaction.isCancelled ? "cancelled_start_finished" : "start_failed")
                 transaction.finish()
                 transactions[transaction.id] = nil
                 onListeningChange?(false)
@@ -282,6 +305,7 @@ final class DictationController {
     }
 
     private func requestStop() {
+        activeTransaction?.timing.stop()
         if isStarting {
             pendingStop = true
             return
@@ -302,6 +326,13 @@ final class DictationController {
             }
             activeBackupURL = nil
             await transcriptTask?.value
+            let snapshot = sessionMetrics?.snapshot
+            if let engine = snapshot?.engineStartedAt { transaction.timing.mark("engine_started", at: engine) }
+            if let first = snapshot?.firstBufferAt { transaction.timing.mark("first_audio_buffer", at: first) }
+            if let ready = snapshot?.analyzerReadyAt { transaction.timing.mark(snapshot?.usedWarmPreparation == true ? "analyzer_ready_warm" : "analyzer_ready_cold", at: ready) }
+            if let final = snapshot?.finalResultAt { transaction.timing.mark("last_final_result", at: final) }
+            transaction.timing.mark("recognition_finished")
+            sessionMetrics = nil
             levelTask?.cancel()
             if let rec = recorder {
                 let drain = audioTask
@@ -313,7 +344,9 @@ final class DictationController {
             }
             recorder = nil
             audioTask = nil
-            let raw = accumulator.committed.isEmpty ? accumulator.preview : accumulator.committed
+            // A failed/overflowed pipeline must recover the complete backup, never
+            // insert a seemingly successful partial transcript.
+            let raw = snapshot?.pipelineFailed == true ? "" : (accumulator.committed.isEmpty ? accumulator.preview : accumulator.committed)
             let hints = options.learning ? CorrectionStore.shared.promptHints(limit: 20) : []
             isListening = false
             isStopping = false
@@ -321,6 +354,7 @@ final class DictationController {
             activeTransaction = nil
             activeOptions = nil
             onListeningChange?(false)
+            prepareRecognition()
 
             if transaction.isCancelled {
                 if let backupURL { try? FileManager.default.removeItem(at: backupURL) }
@@ -358,6 +392,7 @@ final class DictationController {
         let previous = cleanupTail
         let task = Task { [weak self] in
             await previous.value
+            transaction.timing.mark("processing_started")
             guard let self else { return }
             var raw = raw
             var recovered = false
@@ -470,10 +505,12 @@ final class DictationController {
             applyFormatting()
         }
 
+        transaction.timing.mark("local_cleanup_finished")
         var cleanupFallback = false
         if !text.isEmpty, !chain.isEmpty {
             // Each step is tried in turn; a missing key just means that step isn't the one
             // that cleans your text. Only a chain where nothing worked is worth mentioning.
+            transaction.timing.mark("ai_cleanup_started")
             let input = text
             let relevantHints = CleanupPrompt.relevantHints(hints, to: text)
             let runner = runStep
@@ -485,7 +522,11 @@ final class DictationController {
                     await CleanupChain.run(input, chain: chain, hints: relevantHints) { input, step, hints in
                         if let runner { return try await runner(input, step, hints) }
                         guard let configuration = configurations[step] else { throw OpenAICompatibleError.missingConfig }
-                        return try await CleanupService.clean(input, configuration: configuration, hints: Settings.learningEnabled ? hints : [])
+                        let allowedHints = Settings.learningEnabled ? hints : []
+                        if step == .onDevice, let polisher = transaction.polisher {
+                            return try await polisher.clean(input, hints: allowedHints)
+                        }
+                        return try await CleanupService.clean(input, configuration: configuration, hints: allowedHints)
                     }
                 }
             } catch CleanupDeadlineError.expired {
@@ -509,6 +550,7 @@ final class DictationController {
             }
             text = result.text
             cleanupFallback = result.allFailed || timedOut
+            transaction.timing.mark(timedOut ? "ai_cleanup_deadline" : "ai_cleanup_finished")
         }
 
         if options.spokenCommands, options.formattingPosition == .afterCleanup {
@@ -517,12 +559,15 @@ final class DictationController {
 
         try transaction.checkCancellation()
         if !text.isEmpty {
+            transaction.timing.mark("insertion_wait_started")
             try await prepareInsertion()
             try transaction.checkCancellation()
-            saveHistory(.init(date: Date(), stages: stages))
-            recordCompleted()
+            transaction.timing.mark("paste_ready")
             text = DictationSpacing.appendingSeparator(to: text)
             let result = insert(text, transaction.destination)
+            transaction.timing.mark(result == .pasted ? "paste_posted" : "manual_paste_required")
+            saveHistory(.init(date: Date(), stages: stages))
+            recordCompleted()
             if result == .pasted {
                 if options.learning, Settings.learningEnabled {
                     // Count use only when this transaction commits a paste.

@@ -12,6 +12,8 @@ import VoiceKit
 
 @available(macOS 26.0, *)
 struct CleanupPane: View {
+    @AppStorage(Settings.aiPolishingEnabledKey) private var aiPolishingEnabled = false
+    @AppStorage(Settings.cleanupBudgetKey) private var cleanupBudget = 2.0
     @AppStorage(Settings.cleanupChainKey) private var chainRaw = Settings.encodeChain(Settings.cleanupChain)
     @AppStorage(Settings.cleanupInstructionsKey) private var cleanupInstructions = ""
     @AppStorage(Settings.spokenCommandsEnabledKey) private var spokenCommandsEnabled = true
@@ -27,82 +29,103 @@ struct CleanupPane: View {
     var body: some View {
         Form {
             Section {
-                if chain.isEmpty {
-                    Text("Cleanup is off. Filler words are still removed — that costs nothing and never needs a model.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                ForEach(Array(chain.enumerated()), id: \.element) { index, step in
-                    stepRow(step, at: index)
-                }
-
-                if !unused.isEmpty {
-                    Menu {
-                        ForEach(unused) { step in
-                            Button(step.chainName) { append(step) }
-                        }
-                    } label: {
-                        Label("Add a step", systemImage: "plus")
+                Toggle("AI polishing (optional)", isOn: $aiPolishingEnabled)
+                Text("Fast local insertion is the default. Vocabulary, learned corrections, filler removal, and spoken formatting run without waiting for an AI model.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if aiPolishingEnabled {
+                    Picker("Maximum polishing wait", selection: $cleanupBudget) {
+                        Text("1 second").tag(1.0)
+                        Text("2 seconds (default)").tag(2.0)
+                        Text("5 seconds").tag(5.0)
+                        Text("10 seconds").tag(10.0)
+                        Text("30 seconds").tag(30.0)
                     }
-                    .fixedSize()
-                }
-
-                SettingCaptionRow(
-                    caption: String(localized: "Tried top to bottom. The first step that works cleans your text."),
-                    title: String(localized: "Cleanup Chain"),
-                    explanation: String(localized: """
-                        Cleanup punctuates, capitalizes, and resolves the false starts you make \
-                        when you change your mind mid-sentence. ("Um" and "uh" are stripped no \
-                        matter what — that costs nothing and never needs a model.)
-
-                        Out of the box this is just Apple Intelligence: free, on-device, no key, \
-                        nothing leaves your Mac.
-
-                        Each step is tried in order, and the first one that works wins. A step \
-                        with no API key isn't an error — it simply isn't the step that cleans \
-                        your text, and Dictate moves on to the next one.
-
-                        Add a cloud provider and it goes *above* Apple Intelligence, because the \
-                        on-device pass almost always succeeds — anything underneath it would \
-                        never get a turn. So the ones you add are tried first, and on-device \
-                        catches whatever they missed.
-
-                        You only ever see "cleanup failed" if *every* step failed — and even then \
-                        your transcript is inserted unchanged rather than lost.
-                        """),
-                    value: Binding(get: { chain }, set: { chainRaw = Settings.encodeChain($0) })
-                ) { CleanupChainDemo(chain: $0) }
-            } header: {
-                SettingsLabel(String(localized: "Cleanup Chain"), systemImage: "wand.and.sparkles", tint: SettingsTint.cleanup)
-            }
-
-            // One config block per provider actually in the chain, in the order they run.
-            ForEach(chain.compactMap(\.provider)) { provider in
-                ProviderConfigSection(provider: provider)
-            }
-
-            if chain.contains(.onDevice) {
-                Section {
-                    Text(AICleanup.isAvailable
-                         ? String(localized: "Polishes punctuation and removes false starts, entirely on this Mac. Free, and needs no key.")
-                         : String(localized: "Apple Intelligence isn't available on this Mac, so this step will always be skipped."))
-                        .font(.caption)
-                        .foregroundStyle(AICleanup.isAvailable ? Color.secondary : Color.orange)
-                } header: {
-                    SettingsLabel(String(localized: "Apple Intelligence"), systemImage: "apple.logo", tint: SettingsTint.cleanup)
-                }
-            }
-
-            if !chain.isEmpty {
-                Section {
-                    TextField("Custom instructions (optional)", text: $cleanupInstructions, axis: .vertical)
-                        .lineLimit(2...5)
-                    Text("Applied by whichever step ends up cleaning your text — \"use British spelling\", \"keep my bullet points\", and so on.")
+                    Text("The budget starts when polishing begins. If it expires, Dictate pastes the locally processed text. Recognition finalization and earlier queued dictations can add time.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if aiPolishingEnabled {
+                Section {
+                    if chain.isEmpty {
+                        Text("Cleanup is off. Filler words are still removed — that costs nothing and never needs a model.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(Array(chain.enumerated()), id: \.element) { index, step in
+                        stepRow(step, at: index)
+                    }
+
+                    if !unused.isEmpty {
+                        Menu {
+                            ForEach(unused) { step in
+                                Button(step.chainName) { append(step) }
+                            }
+                        } label: {
+                            Label("Add a step", systemImage: "plus")
+                        }
+                        .fixedSize()
+                    }
+
+                    SettingCaptionRow(
+                        caption: String(localized: "Tried top to bottom. The first step that works cleans your text."),
+                        title: String(localized: "Cleanup Chain"),
+                        explanation: String(localized: """
+                            Cleanup punctuates, capitalizes, and resolves the false starts you make \
+                            when you change your mind mid-sentence. ("Um" and "uh" are stripped no \
+                            matter what — that costs nothing and never needs a model.)
+
+                            AI polishing is optional. When enabled, the initial chain is Apple Intelligence: \
+                            on-device, with no key required. The default wait budget is two seconds.
+
+                            Each step is tried in order, and the first one that works wins. A step \
+                            with no API key isn't an error — it simply isn't the step that cleans \
+                            your text, and Dictate moves on to the next one.
+
+                            Add a cloud provider and it goes *above* Apple Intelligence, because the \
+                            on-device pass almost always succeeds — anything underneath it would \
+                            never get a turn. So the ones you add are tried first, and on-device \
+                            catches whatever they missed.
+
+                            You only ever see "cleanup failed" if *every* step failed — and even then \
+                            your transcript is inserted unchanged rather than lost.
+                            """),
+                        value: Binding(get: { chain }, set: { chainRaw = Settings.encodeChain($0) })
+                    ) { CleanupChainDemo(chain: $0) }
                 } header: {
-                    SettingsLabel(String(localized: "Instructions"), systemImage: "text.quote", tint: SettingsTint.cleanup)
+                    SettingsLabel(String(localized: "Cleanup Chain"), systemImage: "wand.and.sparkles", tint: SettingsTint.cleanup)
+                }
+
+                // One config block per provider actually in the chain, in the order they run.
+                ForEach(chain.compactMap(\.provider)) { provider in
+                    ProviderConfigSection(provider: provider)
+                }
+
+                if chain.contains(.onDevice) {
+                    Section {
+                        Text(AICleanup.isAvailable
+                             ? String(localized: "Polishes punctuation and removes false starts, entirely on this Mac. Free, and needs no key.")
+                             : String(localized: "Apple Intelligence isn't available on this Mac, so this step will always be skipped."))
+                            .font(.caption)
+                            .foregroundStyle(AICleanup.isAvailable ? Color.secondary : Color.orange)
+                    } header: {
+                        SettingsLabel(String(localized: "Apple Intelligence"), systemImage: "apple.logo", tint: SettingsTint.cleanup)
+                    }
+                }
+
+                if !chain.isEmpty {
+                    Section {
+                        TextField("Custom instructions (optional)", text: $cleanupInstructions, axis: .vertical)
+                            .lineLimit(2...5)
+                        Text("Applied by whichever step ends up cleaning your text — \"use British spelling\", \"keep my bullet points\", and so on.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        SettingsLabel(String(localized: "Instructions"), systemImage: "text.quote", tint: SettingsTint.cleanup)
+                    }
                 }
             }
 

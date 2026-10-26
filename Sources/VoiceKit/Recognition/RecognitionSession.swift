@@ -51,12 +51,14 @@ public struct RecognitionSession: Sendable {
     /// Known from the start — a caller tidying up old recordings needs to know which file
     /// is still being written to so it doesn't delete the live one.
     public let backupURL: URL?
+    public let metrics: RecognitionMetrics?
 
     public init(
         transcript: AsyncStream<TranscriptionResult>,
         level: AsyncStream<Float>,
         audioBuffers: AsyncStream<AVAudioPCMBuffer>,
         backupURL: URL? = nil,
+        metrics: RecognitionMetrics? = nil,
         timestampedAudioBuffers: AsyncStream<CapturedAudioBuffer> = AsyncStream { $0.finish() }
     ) {
         self.transcript = transcript
@@ -64,5 +66,6 @@ public struct RecognitionSession: Sendable {
         self.audioBuffers = audioBuffers
         self.timestampedAudioBuffers = timestampedAudioBuffers
         self.backupURL = backupURL
+        self.metrics = metrics
     }
 }

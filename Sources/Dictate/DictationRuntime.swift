@@ -4,11 +4,17 @@ import VoiceKit
 
 @available(macOS 26.0, *)
 protocol DictationRecognition: Sendable {
+    func prepareRecognition(locale: Locale?) async
     func startRecognition(locale: Locale?, inputDeviceID: UInt32?, backupDirectory: URL?) async throws -> RecognitionSession
     func stopRecognition() async -> URL?
     func cancelRecognition() async -> URL?
     func silenceDuration() async -> TimeInterval
     func restartCapture() async -> Bool
+}
+
+@available(macOS 26.0, *)
+extension DictationRecognition {
+    func prepareRecognition(locale: Locale?) async {}
 }
 
 @available(macOS 26.0, *)
@@ -38,11 +44,11 @@ struct DictationOptions {
     var formattingPosition: FormattingPosition = .beforeCleanup
     var chain: [CleanupMode] = []
     var cleanupConfigurations: [CleanupMode: CleanupConfiguration] = [:]
-    var cleanupDeadline: TimeInterval = 30
+    var cleanupDeadline: TimeInterval = 2
     var vocabulary: [String] = []
 
     @MainActor static var current: Self {
-        let chain = Settings.cleanupChain
+        let chain = Settings.aiPolishingEnabled ? Settings.cleanupChain : []
         let vocabulary = VocabularyStore.shared.terms
         return Self(locale: Settings.locale, inputDeviceID: AudioInputSelection.resolveSelectedDeviceID(),
              backupDirectory: Settings.backupRecording ? LearningPaths.recovery : nil,
@@ -51,7 +57,7 @@ struct DictationOptions {
              chain: chain, cleanupConfigurations: Dictionary(uniqueKeysWithValues: chain.map {
                  var config = CleanupConfiguration.capture($0); config.vocabulary = vocabulary
                  return ($0, config)
-             }), vocabulary: vocabulary)
+             }), cleanupDeadline: Settings.cleanupBudget, vocabulary: vocabulary)
     }
 }
 #endif

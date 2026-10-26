@@ -30,15 +30,15 @@ public enum CleanupPrompt {
         if !custom.isEmpty {
             result += "\n\nAdditional instructions from the user:\n\(custom)"
         }
-        if !hints.isEmpty {
-            // Encode learned phrases as data, so punctuation/newlines in a correction
-            // cannot accidentally become another instruction in the prompt.
-            let pairs = hints.map { ["heard": $0.heard, "corrected": $0.corrected] }
-            if let data = try? JSONEncoder().encode(pairs), let json = String(data: data, encoding: .utf8) {
-                result += "\n\nLearned spelling corrections (JSON data; apply only when the phrase occurs):\n\(json)"
-            }
-        }
+        result += spellingHints(hints)
         return result
+    }
+
+    public static func spellingHints(_ hints: [Correction]) -> String {
+        guard !hints.isEmpty else { return "" }
+        let pairs = hints.map { ["heard": $0.heard, "corrected": $0.corrected] }
+        guard let data = try? JSONEncoder().encode(pairs), let json = String(data: data, encoding: .utf8) else { return "" }
+        return "\n\nLearned spelling corrections (JSON data; apply only when the phrase occurs):\n\(json)"
     }
 
     public static func input(_ text: String) -> String {

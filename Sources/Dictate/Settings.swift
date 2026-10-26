@@ -321,6 +321,18 @@ enum Settings {
     static let localeKey = "dictate_localeId"
     static let cleanupModeKey = "dictate_cleanupMode"
     static let cleanupChainKey = "dictate_cleanupChain"
+    static let aiPolishingEnabledKey = "dictate_aiPolishingEnabled"
+    static let cleanupBudgetKey = "dictate_cleanupBudget"
+
+    // Explicit opt-in, including upgrades. Saved provider chains and credentials stay intact.
+    static var aiPolishingEnabled: Bool { polishingPolicy(defaults: .standard).enabled }
+    static var cleanupBudget: TimeInterval {
+        polishingPolicy(defaults: .standard).budget
+    }
+    static func polishingPolicy(defaults: UserDefaults) -> (enabled: Bool, budget: TimeInterval) {
+        let value = defaults.object(forKey: cleanupBudgetKey) as? Double ?? 2
+        return (defaults.bool(forKey: aiPolishingEnabledKey), value.isFinite ? min(30, max(0.25, value)) : 2)
+    }
     static let claudeModelKey = "dictate_claudeModel"
     /// Shared across cleanup providers; key name kept for back-compat.
     static let cleanupInstructionsKey = "dictate_claudeInstructions"
@@ -372,13 +384,13 @@ enum Settings {
 
     /// Cleanup steps, tried in order until one works. Empty means cleanup is off.
     ///
-    /// Defaults to the on-device pass: it's free, needs no key, sends nothing anywhere, and
-    /// works the moment you install. Anything else is something the user opts into.
+    /// The saved chain is used only after explicit AI-polishing opt-in. Its initial
+    /// provider is on-device Apple Intelligence; fast local insertion is the default. Anything else is something the user opts into.
     static var cleanupChain: [CleanupMode] {
         if let raw = UserDefaults.standard.string(forKey: cleanupChainKey) {
             return decodeChain(raw)
         }
-        // No chain and no legacy choice: a fresh install, which gets the sensible default.
+        // No chain and no legacy choice: a fresh install, which gets the initial opt-in provider.
         guard UserDefaults.standard.string(forKey: cleanupModeKey) != nil
                 || UserDefaults.standard.object(forKey: legacyAICleanupKey) != nil else {
             return [.onDevice]

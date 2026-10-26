@@ -19,7 +19,22 @@ enum ReliabilityPreview {
             try? FileManager.default.removeItem(at: directory)
         }
         let window: NSWindowController
-        if CommandLine.arguments.contains("--preview-vocabulary") {
+        if CommandLine.arguments.contains("--preview-cleanup") {
+            let suiteName = "Dictate-Cleanup-Preview-\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defaults.set(false, forKey: Settings.aiPolishingEnabledKey)
+            let host = NSHostingController(rootView: CleanupPane().defaultAppStorage(defaults))
+            let viewWindow = NSWindow(contentViewController: host)
+            viewWindow.title = "Cleanup — isolated preview"
+            viewWindow.setContentSize(NSSize(width: 680, height: 640))
+            viewWindow.styleMask = [.titled, .closable, .resizable]
+            viewWindow.center()
+            window = NSWindowController(window: viewWindow)
+            window.showWindow(nil)
+            NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+                UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+            }
+        } else if CommandLine.arguments.contains("--preview-vocabulary") {
             let store = VocabularyStore(fileURL: directory.appendingPathComponent("vocabulary.json"))
             try? store.setTerms(["OpenWhispr", "VoiceKit", "Kubernetes"])
             let host = NSHostingController(rootView: Form { VocabularySection(store: store) }.formStyle(.grouped))

@@ -69,6 +69,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { self?.hotkeyMonitor.start() }
         }
 
+        NotificationCenter.default.addObserver(forName: .dictateSpeechReady, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                if Settings.termsAccepted { self?.controller.prepareRecognition() }
+            }
+        }
         NotificationCenter.default.addObserver(forName: .dictateOpenCleanupSettings, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.showSettings() }
         }
@@ -126,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                if Settings.termsAccepted { self.controller.prepareRecognition() }
                 self.hotkeyMonitor.hotkey = Settings.hotkey
                 self.hintMenuItem?.title = String(
                     format: String(localized: "Hold %@ to dictate"), Settings.hotkey.displayName
@@ -140,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The onboarding/permission flow, gated behind Terms acceptance.
     private func beginAfterTerms() {
+        controller.prepareRecognition()
         recoveryRetentionTask?.cancel()
         recoveryRetentionTask = Task {
             while !Task.isCancelled {

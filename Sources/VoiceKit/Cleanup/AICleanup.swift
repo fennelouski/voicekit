@@ -34,17 +34,33 @@ public enum AICleanup {
     /// tell "Apple Intelligence polished this" apart from "Apple Intelligence did nothing" —
     /// otherwise an unavailable model looks like a success and the chain stops at it.
     public static func clean(_ text: String, hints: [Correction] = [], customInstructions: String = "") async throws -> String {
-        guard isAvailable else { throw AICleanupError.unavailable }
-        let session = LanguageModelSession(instructions: CleanupPrompt.instructions(
-            customInstructions: customInstructions, hints: hints
-        ))
-        let prompt = CleanupPrompt.input(text)
-        let response = try await session.respond(to: prompt)
-        let cleaned = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty else { throw AICleanupError.emptyResponse }
-        guard TranscriptCleaner.preservesWording(original: text, cleaned: cleaned) else {
-            throw AICleanupError.invalidResponse
+        let prepared = PreparedSession(customInstructions: customInstructions)
+        return try await prepared.clean(text, hints: hints)
+    }
+
+    /// A fresh session per dictation. Only explicitly opted-in polishing loads this
+    /// model; no conversation or prior dictation is carried into the next request.
+    public actor PreparedSession {
+        private let session: LanguageModelSession
+        public init(customInstructions: String = "") {
+            session = LanguageModelSession(instructions: CleanupPrompt.instructions(customInstructions: customInstructions))
         }
-        return cleaned
+        public func prewarm() {
+            guard AICleanup.isAvailable else { return }
+            session.prewarm()
+        }
+        public func clean(_ text: String, hints: [Correction] = []) async throws -> String {
+            try Task.checkCancellation()
+            guard AICleanup.isAvailable else { throw AICleanupError.unavailable }
+            let prompt = CleanupPrompt.input(text) + CleanupPrompt.spellingHints(hints)
+            let response = try await session.respond(to: prompt)
+            try Task.checkCancellation()
+            let cleaned = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleaned.isEmpty else { throw AICleanupError.emptyResponse }
+            guard TranscriptCleaner.preservesWording(original: text, cleaned: cleaned) else {
+                throw AICleanupError.invalidResponse
+            }
+            return cleaned
+        }
     }
 }

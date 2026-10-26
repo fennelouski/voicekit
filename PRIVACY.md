@@ -64,9 +64,16 @@ Dictate is made by Nathan Fennel. Contact: nathan@100apps.studio.
   focused text field through the Accessibility API. Password and other secure text fields are never
   read.
 
+## Local performance logs
+
+Dictate writes local macOS performance logs containing random transaction identifiers, fixed
+processing-stage names, and elapsed milliseconds. They contain no audio, transcript, application
+or window names, file paths, or credentials. These timing logs are not uploaded. Speech model
+preparation may run while idle after permission grants; it does not open or record the microphone.
+
 ## Optional cloud cleanup
 
-Dictate can polish a transcript before inserting it. The on-device options (Apple Intelligence) keep
+Fast local insertion is the macOS default. AI polishing requires explicit opt-in in Cleanup settings, including after upgrading; saved provider configurations are retained. Dictate can polish a transcript before inserting it. The on-device options (Apple Intelligence) keep
 everything local. If you choose a cloud provider (Claude, OpenAI, Google, Groq, OpenRouter, or a
 custom OpenAI-compatible server), your transcribed text, relevant learned correction hints, and explicit vocabulary, never
 the audio, are sent to that provider to be cleaned. Cloud providers require your own API key;

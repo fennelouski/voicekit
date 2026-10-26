@@ -11,7 +11,7 @@ import AppKit
 if #available(macOS 26.0, *) {
     MainActor.assumeIsolated {
 #if DEBUG
-        if Bundle.main.bundleIdentifier == "studio.100apps.Dictate.preview" || CommandLine.arguments.contains("--preview-recovery") || CommandLine.arguments.contains("--preview-vocabulary") {
+        if Bundle.main.bundleIdentifier == "studio.100apps.Dictate.preview" || CommandLine.arguments.contains("--preview-recovery") || CommandLine.arguments.contains("--preview-vocabulary") || CommandLine.arguments.contains("--preview-cleanup") {
             ReliabilityPreview.run()
             return
         }

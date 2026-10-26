@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MODE="${1:-recovery}"
-case "$MODE" in recovery|vocabulary) ;; *) echo 'Use recovery or vocabulary' >&2; exit 1 ;; esac
+case "$MODE" in recovery|vocabulary|cleanup) ;; *) echo 'Use recovery, vocabulary, or cleanup' >&2; exit 1 ;; esac
 BUILD_CONFIGURATION=debug CODE_SIGN_IDENTITY=- Scripts/make-app.sh
 PREVIEW=build/DictatePreview.app
 rm -rf "$PREVIEW"

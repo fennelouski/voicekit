@@ -22,7 +22,7 @@ A cancelled cold start keeps the recognition service exclusive until it returns 
 
 `InsertionGate` has no suspension between verifying the destination and posting the process-addressed events. `ClipboardTransaction` continues to restore existing formats only while it owns the clipboard. A destination mismatch uses an explicit manual-copy path and cancels any pending clipboard restore.
 
-Recording, formatting, locale, vocabulary, and full immutable provider model/key/URL/instruction options are captured at start. A 30-second total cleanup deadline retires late model results. Before committing a queued insertion, the controller waits through the preceding clipboard settling interval and rechecks cancellation/focus. The existing Accessibility correction observer also rechecks the insertion destination before its delayed field snapshot, and excludes secure subroles.
+Recording, formatting, locale, vocabulary, and full immutable provider model/key/URL/instruction options are captured at start. Optional AI polishing has a two-second default total deadline (configurable up to 30 seconds) that retires late model results. Before committing a queued insertion, the controller waits through the preceding clipboard settling interval and rechecks cancellation/focus. The existing Accessibility correction observer also rechecks the insertion destination before its delayed field snapshot, and excludes secure subroles.
 
 ## Verification
 
@@ -58,3 +58,5 @@ Actual Accessibility identities and process-addressed paste delivery still need 
 The guard checks the field/window, not a saved caret or selection range. Moving the caret or editing within the **same field** while cleanup runs still uses that field's current caret. Synchronous focus checking and event posting cannot establish an atomic transaction with an arbitrary third-party application: that would require editor acknowledgement or a targeted insertion API. No automatic retry or app activation is introduced here.
 
 The macOS event tap and process-directed event APIs follow Apple's [event tap documentation](https://developer.apple.com/documentation/coregraphics/cgevent/tapcreate(tap:place:options:eventsofinterest:callback:userinfo:)) and [CGEvent API](https://developer.apple.com/documentation/coregraphics/cgevent).
+
+See [dictation latency](dictation-latency.md) for warm preparation, fast local defaults, and local measurement commands added October 15, 2026.

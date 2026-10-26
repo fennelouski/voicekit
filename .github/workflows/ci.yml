@@ -26,6 +26,8 @@ jobs:
         run: |
           Scripts/make-app.sh
           Scripts/validate-app.sh build/Dictate.app
+      - name: Local timing report tests
+        run: python3 Scripts/test-measure-latency.py
       - name: Whitespace
         run: git diff --check
   ios:

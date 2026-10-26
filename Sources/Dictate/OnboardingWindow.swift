@@ -28,6 +28,7 @@ enum PermissionRecovery {
 extension Notification.Name {
     /// Posted when Accessibility trust flips on mid-onboarding, so the
     /// global hotkey monitor can re-register without an app relaunch.
+    static let dictateSpeechReady = Notification.Name("dictate.speechReady")
     static let dictateAccessibilityGranted = Notification.Name("dictate.accessibilityGranted")
 }
 
@@ -92,8 +93,12 @@ final class PermissionModel: ObservableObject {
     }
 
     func refresh() {
+        let speechWasReady = mic == .granted && speech == .granted
         mic = Self.map(AVCaptureDevice.authorizationStatus(for: .audio))
         speech = Self.map(SFSpeechRecognizer.authorizationStatus())
+        if !speechWasReady, mic == .granted, speech == .granted {
+            NotificationCenter.default.post(name: .dictateSpeechReady, object: nil)
+        }
         let trusted = AXIsProcessTrusted()
         if trusted, !accessibility {
             NotificationCenter.default.post(name: .dictateAccessibilityGranted, object: nil)

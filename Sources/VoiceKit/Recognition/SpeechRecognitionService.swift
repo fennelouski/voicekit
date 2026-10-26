@@ -32,8 +32,72 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
-    private var analyzerFormat: AVAudioFormat?
-    private var bufferConverter: BufferConverter?
+    private struct Pipeline: Sendable {
+        let transcriber: SpeechTranscriber
+        let analyzer: SpeechAnalyzer
+        let format: AVAudioFormat
+    }
+    private let preparation = WarmPreparation<Pipeline>()
+    private var warmKey: String?
+    private var warmReadyKey: String?
+    private var warmGeneration = UUID()
+    private var preparationTask: Task<Pipeline, Error>?
+    private var analysisTask: Task<Void, Never>?
+    private var audioQueue: RecognitionAudioQueue?
+    private var metrics = RecognitionMetrics()
+    private var sessionID: UUID?
+
+    /// Loads speech resources without opening the microphone or prompting for permission.
+    /// A new language replaces only unclaimed preparation, never an active recording.
+    public func prepareRecognition(locale: Locale? = nil) async {
+        guard Self.authorizationStatus() == .authorized else { return }
+        #if os(macOS)
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        #else
+        guard AVAudioApplication.shared.recordPermission == .granted else { return }
+        #endif
+        let locale = locale ?? Locale.current
+        guard warmKey != locale.identifier else { return }
+        warmKey = locale.identifier
+        warmReadyKey = nil
+        let generation = UUID()
+        warmGeneration = generation
+        let task = await preparation.warm(key: locale.identifier) { try await Self.preparePipeline(locale: locale) }
+        do {
+            _ = try await task.value
+            if warmGeneration == generation { warmReadyKey = locale.identifier }
+        }
+        catch {
+            // Invalidate only this attempt; a newer language may already be warming.
+            if warmGeneration == generation {
+                warmKey = nil
+                await preparation.invalidate()
+            }
+        }
+    }
+
+    private static func preparePipeline(locale: Locale) async throws -> Pipeline {
+        try Task.checkCancellation()
+        let supported = await SpeechTranscriber.supportedLocales
+        try Task.checkCancellation()
+        guard supported.contains(where: { $0.language.languageCode == locale.language.languageCode }) else {
+            throw RecognitionError.localeNotSupported
+        }
+        let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            do { try await request.downloadAndInstall() }
+            catch { if Task.isCancelled { throw CancellationError() }; throw RecognitionError.modelDownloadFailed(error) }
+        }
+        try Task.checkCancellation()
+        let analyzer = SpeechAnalyzer(modules: [transcriber], options: .init(priority: .userInitiated, modelRetention: .lingering))
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            throw RecognitionError.recognitionUnavailable
+        }
+        try Task.checkCancellation()
+        try await analyzer.prepareToAnalyze(in: format)
+        try Task.checkCancellation()
+        return Pipeline(transcriber: transcriber, analyzer: analyzer, format: format)
+    }
 
     // Audio engine. Built per session, and rebuildable within one — see `buildEngine`.
     private var audioEngine: AVAudioEngine?
@@ -56,7 +120,14 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     private var resultsTask: Task<Void, Swift.Error>?
     private var transcriptContinuation: AsyncStream<TranscriptionResult>.Continuation?
 
-    public init() {}
+    private let captureWhilePreparing: Bool
+
+    /// Early capture is an opt-in for hosts that inspect session.metrics and can
+    /// recover failed analysis from backup audio. The default preserves startup
+    /// error delivery for existing TranscriptionProvider clients.
+    public init(captureWhilePreparing: Bool = false) {
+        self.captureWhilePreparing = captureWhilePreparing
+    }
 
     /// Check current speech recognition authorization status.
     public static func authorizationStatus() -> SFSpeechRecognizerAuthorizationStatus {
@@ -98,12 +169,18 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     ///   - backupDirectory: If set, the session's microphone audio is also written to a file
     ///     here, so a transcription that comes back empty can be retried offline. The caller
     ///     owns the file once `stopRecognition()` hands back its URL.
-    /// - Throws: `RecognitionError.notAuthorized` if permission denied, `RecognitionError.localeNotSupported` if locale unavailable.
+    /// - Throws: Permission, capture, or (by default) preparation failures. With early
+    ///   capture enabled, deferred analysis errors set `session.metrics.pipelineFailed`;
+    ///   the host must recover its backup or discard any partial transcript.
     public func startRecognition(
         locale: Locale? = nil,
         inputDeviceID: UInt32? = nil,
         backupDirectory: URL? = nil
     ) async throws -> RecognitionSession {
+        try Task.checkCancellation()
+        guard sessionID == nil else { throw RecognitionError.recognitionUnavailable }
+        let id = UUID()
+        sessionID = id
         do {
             try Task.checkCancellation()
             // Check authorization
@@ -130,48 +207,23 @@ public actor SpeechRecognitionService: TranscriptionProvider {
             }
             #endif
 
-            // Determine locale
+            // Claim this session before any suspension. Preparation can finish later;
+            // microphone capture is independent and queues copied opening audio.
             let recognitionLocale = locale ?? Locale.current
-
-            // Verify locale is supported
-            let supportedLocales = await SpeechTranscriber.supportedLocales
-            try Task.checkCancellation()
-            let localeSupported = supportedLocales.contains { supported in
-                supported.language.languageCode == recognitionLocale.language.languageCode
+            metrics = RecognitionMetrics()
+            metrics.warm(warmReadyKey == recognitionLocale.identifier)
+            warmKey = nil
+            warmReadyKey = nil
+            warmGeneration = UUID()
+            let pipelineTask = await preparation.take(key: recognitionLocale.identifier) {
+                try await Self.preparePipeline(locale: recognitionLocale)
             }
-            guard localeSupported else {
-                throw RecognitionError.localeNotSupported
+            preparationTask = pipelineTask
+            if !captureWhilePreparing {
+                _ = try await withTaskCancellationHandler {
+                    try await pipelineTask.value
+                } onCancel: { pipelineTask.cancel() }
             }
-
-            // Create transcriber — progressiveTranscription preset for low-latency live transcription
-            let newTranscriber = SpeechTranscriber(
-                locale: recognitionLocale,
-                preset: .progressiveTranscription
-            )
-            transcriber = newTranscriber
-
-            // Ensure speech model is installed
-            if let downloadRequest = try await AssetInventory.assetInstallationRequest(supporting: [newTranscriber]) {
-                try Task.checkCancellation()
-                do {
-                    try await downloadRequest.downloadAndInstall()
-                    try Task.checkCancellation()
-                } catch {
-                    if Task.isCancelled { throw CancellationError() }
-                    throw RecognitionError.modelDownloadFailed(error)
-                }
-            }
-
-            try Task.checkCancellation()
-            // Create analyzer
-            let newAnalyzer = SpeechAnalyzer(modules: [newTranscriber])
-            analyzer = newAnalyzer
-
-            // Get optimal audio format for the transcriber
-            let optimalFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [newTranscriber])
-            try Task.checkCancellation()
-            analyzerFormat = optimalFormat
-            bufferConverter = BufferConverter()
 
             // Configure audio session for recording (iOS/visionOS only; macOS handles this via AVAudioEngine).
             // `.record`, not `.playAndRecord`: dictation never plays audio, and a keyboard extension's
@@ -186,13 +238,6 @@ public actor SpeechRecognitionService: TranscriptionProvider {
                 throw RecognitionError.engineStartFailed(error)
             }
             #endif
-
-            // Create the input stream for feeding audio to the analyzer
-            let (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
-            inputContinuation = inputBuilder
-
-            // Start the analyzer with the input sequence
-            try await newAnalyzer.start(inputSequence: inputSequence)
 
             try Task.checkCancellation()
             // Set up level stream
@@ -215,25 +260,51 @@ public actor SpeechRecognitionService: TranscriptionProvider {
                 self.transcriptContinuation = continuation
             }
 
-            // Spawn task to consume transcriber results
-            let capturedTranscriptCont = transcriptContinuation
-            resultsTask = Task {
+            let queue = RecognitionAudioQueue()
+            audioQueue = queue
+            let sessionMetrics = metrics
+            analysisTask = Task { [self] in
                 do {
-                    for try await result in newTranscriber.results {
-                        let text = String(result.text.characters)
-                        let isFinal = result.isFinal
-                        guard !text.isEmpty else { continue }
-                        Self.logger.debug("segment: \"\(text, privacy: .private)\" isFinal: \(isFinal)")
-                        let range = result.range
-                        capturedTranscriptCont?.yield(TranscriptionResult(
-                            text: text, isFinal: isFinal,
-                            start: range.start.seconds.isFinite ? range.start.seconds : nil,
-                            end: range.end.seconds.isFinite ? range.end.seconds : nil))
+                    let pipeline = try await pipelineTask.value
+                    try Task.checkCancellation()
+                    guard sessionID == id else { throw CancellationError() }
+                    transcriber = pipeline.transcriber
+                    analyzer = pipeline.analyzer
+                    let converter = BufferConverter()
+                    let (inputs, builder) = AsyncStream<AnalyzerInput>.makeStream()
+                    inputContinuation = builder
+                    let transcript = transcriptContinuation
+                    resultsTask = Task {
+                        do {
+                            for try await result in pipeline.transcriber.results {
+                                try Task.checkCancellation()
+                                let text = String(result.text.characters)
+                                guard !text.isEmpty else { continue }
+                                if result.isFinal { sessionMetrics.finalResult() }
+                                let range = result.range
+                                transcript?.yield(.init(text: text, isFinal: result.isFinal,
+                                    start: range.start.seconds.isFinite ? range.start.seconds : nil,
+                                    end: range.end.seconds.isFinite ? range.end.seconds : nil))
+                            }
+                        } catch {
+                            if !Task.isCancelled { sessionMetrics.fail() }
+                        }
+                        transcript?.finish()
                     }
+                    try await pipeline.analyzer.start(inputSequence: inputs)
+                    sessionMetrics.analyzerReady()
+                    for try await packet in queue.stream {
+                        try Task.checkCancellation()
+                        let converted = try converter.convertBuffer(packet.buffer, to: pipeline.format)
+                        builder.yield(AnalyzerInput(buffer: converted))
+                    }
+                    builder.finish()
                 } catch {
-                    Self.logger.error("results stream error: \(error)")
+                    if !Task.isCancelled { sessionMetrics.fail(); Self.logger.error("recognition pipeline failed; recovery required") }
+                    inputContinuation?.finish()
+                    await analyzer?.cancelAndFinishNow()
+                    transcriptContinuation?.finish()
                 }
-                capturedTranscriptCont?.finish()
             }
 
             // Keep a copy of the audio on disk when the caller asked for one, so a session that
@@ -261,7 +332,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
             return RecognitionSession(
                 transcript: transcriptStream, level: levelStream,
                 audioBuffers: audioBufferStream, backupURL: backup?.url,
-                timestampedAudioBuffers: timestampedAudioStream
+                metrics: metrics, timestampedAudioBuffers: timestampedAudioStream
             )
         } catch {
             // Failed or cancelled starts may already own an analyzer and streams.
@@ -358,9 +429,8 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         let levelCont = levelContinuation
         let audioBufferCont = audioBufferContinuation
         let timestampedAudioCont = timestampedAudioContinuation
-        let inputBuilder = inputContinuation
-        let converter = bufferConverter
-        let targetFormat = analyzerFormat
+        let queue = audioQueue
+        let metrics = self.metrics
         let heartbeat = self.heartbeat
         let backup = self.backup
         // Boxed in the closure rather than kept on the actor: the tap runs off-actor, and
@@ -370,23 +440,15 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         let tap: AVAudioNodeTapBlock = { buffer, time in
             heartbeat.beat()
 
-            // Feed converted audio to the analyzer
-            if let targetFormat, let converter {
-                do {
-                    let converted = try converter.convertBuffer(buffer, to: targetFormat)
-                    inputBuilder?.yield(AnalyzerInput(buffer: converted))
-                } catch {
-                    Self.logger.error("buffer conversion error: \(error)")
-                }
-            }
-
+            metrics.audioArrived()
             backup?.write(buffer)
-
-            // Forward raw audio buffer for camera recording
-            audioBufferCont?.yield(buffer)
-            if let captured = CapturedAudioBuffer.copy(buffer, at: time) {
+            let captureTime = time.isHostTimeValid ? time : AVAudioTime(hostTime: mach_absolute_time())
+            if let captured = CapturedAudioBuffer.copy(buffer, at: captureTime) {
+                if queue?.append(captured) == false { metrics.fail() }
+                // Share the owned, immutable copy; never send engine-owned memory.
+                audioBufferCont?.yield(captured.buffer)
                 timestampedAudioCont?.yield(captured)
-            }
+            } else { metrics.fail() }
 
             // Compute RMS level for mic indicator (throttled)
             levelBufferCount += 1
@@ -396,7 +458,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         }
 
         do {
-            try inputNode.installTapSafely(onBus: 0, bufferSize: 4096, format: recordingFormat, block: tap)
+            try inputNode.installTapSafely(onBus: 0, bufferSize: 1024, format: recordingFormat, block: tap)
         } catch {
             throw RecognitionError.engineStartFailed(error)
         }
@@ -409,6 +471,7 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         }
 
         audioEngine = engine
+        metrics.engineStarted()
         heartbeat.reset()
     }
 
@@ -426,11 +489,15 @@ public actor SpeechRecognitionService: TranscriptionProvider {
     @discardableResult
     public func stopRecognition() async -> URL? {
         let finishingAnalyzer = analyzer
+        let finishingPreparation = preparationTask
+        let finishingAnalysis = analysisTask
         return await withTaskCancellationHandler {
             await endRecognition(discardingResults: false)
         } onCancel: {
             // Target the analyzer that was being finalized, never a replacement
             // session that may start after this stop returns.
+            finishingPreparation?.cancel()
+            finishingAnalysis?.cancel()
             Task { await finishingAnalyzer?.cancelAndFinishNow() }
         }
     }
@@ -448,6 +515,18 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         let backupURL = backup?.finish()
         backup = nil
 
+        audioQueue?.continuation.finish()
+        if discardingResults || Task.isCancelled {
+            preparationTask?.cancel()
+            analysisTask?.cancel()
+        }
+        // Drain all captured audio into the analyzer BEFORE finalization. Escape
+        // cancels both preparation and feeding, preventing a late model resurrection.
+        await analysisTask?.value
+        analysisTask = nil
+        preparationTask = nil
+        audioQueue = nil
+
         // Finish the input stream to signal end of audio
         inputContinuation?.finish()
         inputContinuation = nil
@@ -458,15 +537,24 @@ public actor SpeechRecognitionService: TranscriptionProvider {
                 resultsTask?.cancel()
                 await analyzer.cancelAndFinishNow()
             } else {
-                try? await analyzer.finalizeAndFinishThroughEndOfInput()
+                // Resolve the analyzer after preparation/draining. The analyzer may
+                // have been nil when stop was requested during a cold start.
+                await withTaskCancellationHandler {
+                    do { try await analyzer.finalizeAndFinishThroughEndOfInput() }
+                    catch { if !Task.isCancelled { metrics.fail() } }
+                } onCancel: {
+                    Task { await analyzer.cancelAndFinishNow() }
+                }
             }
         }
 
         // Drain remaining results so the last committed segment isn't dropped.
         // Bounded: cancel the results task if it hasn't finished within 2 seconds.
         if let task = resultsTask {
+            let sessionMetrics = metrics
             let timeout = Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                sessionMetrics.fail()
                 task.cancel()
             }
             try? await task.value
@@ -492,9 +580,8 @@ public actor SpeechRecognitionService: TranscriptionProvider {
         // Clean up state
         transcriber = nil
         analyzer = nil
-        analyzerFormat = nil
-        bufferConverter = nil
         requestedDeviceID = nil
+        sessionID = nil
 
         return backupURL
     }

@@ -7,7 +7,7 @@ Implemented October 14, 2026. This follows the [OpenWhispr transfer roadmap](ope
 - Recording snapshots locale, microphone, formatting, cleanup chain, model, URL, instructions,
   credentials, and vocabulary. Credentials stay in memory and Keychain; configuration descriptions
   redact them. Turning off learning/transcript saving/recovery takes effect on outstanding work.
-- Cleanup has a 30-second total deadline. A late noncooperative model cannot commit after the
+- AI polishing is opt-in, with a two-second default total deadline (configurable up to 30 seconds). A late noncooperative model cannot commit after the
   timeout or Escape. Timeout inserts the local fallback once. Cancellation inserts nothing.
 - Known official OpenAI reasoning models use completion-token budgets and low reasoning effort;
   ordinary official models use bounded output tokens. Compatible servers keep minimal requests.
@@ -146,3 +146,5 @@ non-English locale (3,132 locale-key instances)**. This is recorded translation 
 translation audit. The speech-permission disclosure was corrected across the 33 source-language
 files; native review remains advisable. The canonical privacy policy changed; its website mirror
 still needs publication with the next website update.
+
+See [dictation latency](dictation-latency.md) for warm preparation, fast local defaults, and local measurement commands added October 15, 2026.

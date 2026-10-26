@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import VoiceKit
+@testable import VoiceKit
 @testable import Dictate
 
 /// Gates intentionally ignore task cancellation, modelling a provider or cold
@@ -29,16 +29,18 @@ private actor TransactionRecognition: DictationRecognition {
     var stopGate: TransactionGate?
     var backup: URL?
     var text = "hello there"
+    var metrics: RecognitionMetrics?
     private var transcript: AsyncStream<TranscriptionResult>.Continuation?
     private(set) var starts = 0
     private(set) var stops = 0
     private(set) var cancels = 0
 
-    init(startGate: TransactionGate? = nil, stopGate: TransactionGate? = nil, backup: URL? = nil, text: String = "hello there") {
+    init(startGate: TransactionGate? = nil, stopGate: TransactionGate? = nil, backup: URL? = nil, text: String = "hello there", metrics: RecognitionMetrics? = nil) {
         self.startGate = startGate
         self.stopGate = stopGate
         self.backup = backup
         self.text = text
+        self.metrics = metrics
     }
 
     func startRecognition(locale: Locale?, inputDeviceID: UInt32?, backupDirectory: URL?) async throws -> RecognitionSession {
@@ -47,7 +49,7 @@ private actor TransactionRecognition: DictationRecognition {
         let (stream, continuation) = AsyncStream<TranscriptionResult>.makeStream()
         transcript = continuation
         return RecognitionSession(transcript: stream, level: AsyncStream { $0.finish() },
-                                  audioBuffers: AsyncStream { $0.finish() }, backupURL: backup)
+                                  audioBuffers: AsyncStream { $0.finish() }, backupURL: backup, metrics: metrics)
     }
 
     func stopRecognition() async -> URL? {
@@ -95,6 +97,7 @@ private final class TransactionHarness {
     var copied: [String] = []
     var history: [String] = []
     var completed = 0
+    var timings: [DictationTiming.Event] = []
 
     init(recognition: TransactionRecognition = TransactionRecognition()) { self.recognition = recognition }
 
@@ -104,7 +107,7 @@ private final class TransactionHarness {
         prepareInsertion: @escaping @MainActor () async throws -> Void = {}
     ) -> DictationController {
         DictationController(
-            service: recognition, hud: hud, captureOptions: { self.options },
+            timingSink: { self.timings.append($0) }, service: recognition, hud: hud, captureOptions: { self.options },
             captureDestination: {
                 let pid = self.focusedProcess
                 let field = self.focusedField
@@ -131,6 +134,64 @@ struct DictationTransactionTests {
         while !(await predicate()), ContinuousClock.now < deadline { await Task.yield() }
         #expect(await predicate(), "transaction did not settle")
         try #require(await predicate())
+    }
+
+    @Test func fastLocalInsertionDoesNotCallAnyAIProviderAndEmitsTimings() async throws {
+        guard #available(macOS 26.0, *) else { return }
+        let harness = TransactionHarness()
+        harness.options.chain = []
+        harness.options.vocabulary = ["Hello"]
+        let controller = harness.controller { _, _, _ in Issue.record("fast mode invoked AI"); return "" }
+        controller.toggleManual()
+        try await eventually { harness.hud.listening }
+        controller.toggleManual()
+        try await eventually { !controller.hasOutstandingWork }
+        #expect(harness.pasted.map(\.0) == ["Hello there "])
+        let stages = harness.timings.map(\.stage)
+        #expect(stages.first == "requested")
+        #expect(stages.contains("stop_requested"))
+        #expect(stages.contains("local_cleanup_finished"))
+        #expect(stages.last == "paste_posted")
+        #expect(!stages.contains("ai_cleanup_started"))
+        let paste = try #require(harness.timings.last)
+        #expect(paste.fromStopMS != nil)
+        #expect(paste.fromStartMS >= 0)
+    }
+
+    @Test func failedLivePipelineRecoversInsteadOfInsertingPartialText() async throws {
+        guard #available(macOS 26.0, *) else { return }
+        let metrics = RecognitionMetrics()
+        metrics.fail()
+        let backup = URL(fileURLWithPath: "/tmp/voicekit-test-partial-backup.caf")
+        let recognition = TransactionRecognition(backup: backup, text: "partial", metrics: metrics)
+        let harness = TransactionHarness(recognition: recognition)
+        harness.options.chain = []
+        let controller = harness.controller(recover: { url, _ in
+            #expect(url == backup)
+            return "complete recovered sentence"
+        })
+        controller.toggleManual()
+        try await eventually { harness.hud.listening }
+        controller.toggleManual()
+        try await eventually { !controller.hasOutstandingWork }
+        #expect(harness.pasted.map(\.0) == ["complete recovered sentence "])
+    }
+
+    @Test func cancellationEmitsNoPasteTimingOrHistory() async throws {
+        guard #available(macOS 26.0, *) else { return }
+        let gate = TransactionGate()
+        let harness = TransactionHarness()
+        let controller = harness.controller { text, _, _ in await gate.wait(); return text }
+        controller.toggleManual()
+        try await eventually { harness.hud.listening }
+        controller.toggleManual()
+        try await eventually { await gate.entered }
+        #expect(controller.cancel())
+        await gate.open()
+        try await eventually { !controller.hasOutstandingWork }
+        #expect(harness.timings.filter { $0.stage == "cancelled" }.count == 1)
+        #expect(!harness.timings.contains { $0.stage == "paste_posted" })
+        #expect(harness.history.isEmpty)
     }
 
     @Test(arguments: ["application", "field", "window"])
