@@ -1,0 +1,5 @@
+#!/bin/bash
+# Gate pushes using the same local checks developers run directly.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+exec Scripts/check.sh

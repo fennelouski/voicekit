@@ -44,7 +44,7 @@ This is a source-level comparison, not a benchmark of OpenWhispr's runtime. Upst
 | History should preserve the original and show what failed | Failure/pruning applied; extra tools optional | History keeps raw and applied stages, safe failure reasons and immediate persisted pruning. Audio retry/export has a recovery window. Additional text re-cleanup, history search/export and explicit insertion retry remain optional features. | [cleanup/history regression](https://github.com/OpenWhispr/openwhispr/blob/2516e6e000b866a06099f69fd851b914069653d4/test/services/cleanupOutputValidation.test.js) |
 | Permission recovery belongs inside the product | Refine existing flow | Keep guided onboarding and clipboard fallback; add a focused end-to-end self-test for microphone, model availability, hotkey delivery, and paste with direct settings links. | [permission guide](https://github.com/OpenWhispr/openwhispr/blob/2516e6e000b866a06099f69fd851b914069653d4/src/components/onboarding/usePermissionGuide.ts) |
 | Benchmarks should exercise real recordings and race conditions | Harness/races applied; real corpus pending | Added local WER/CER/file-latency evaluation, synthetic smoke fixture generation, explicit hardware skips, and deadline/recovery/cancellation races. Real recordings, streaming/paste latency and signed-app device compatibility remain release measurements. | [recording harness](https://github.com/OpenWhispr/openwhispr/blob/2516e6e000b866a06099f69fd851b914069653d4/test/helpers/harness/audioRecorder.js) |
-| Ship runtime/license checks and desktop/mobile CI separately | CI/bundle/notices applied; distribution checks remain | Separate macOS/iOS CI and bundle validation are added. Source dependencies are locked; runtime/license notices ship with the app. Model provenance, signed-update permission continuity, translation review and notarized updater artifacts remain release checks. | [CI scopes](https://github.com/OpenWhispr/openwhispr/blob/2516e6e000b866a06099f69fd851b914069653d4/.github/workflows/ci-changes.yml) |
+| Ship runtime/license checks and desktop/mobile CI separately | Local checks/bundle/notices applied; distribution checks remain | `Scripts/check.sh` runs macOS/iOS tests and bundle validation locally; a pre-push hook gates pushes. Source dependencies are locked; runtime/license notices ship with the app. Model provenance, signed-update permission continuity, translation review and notarized updater artifacts remain release checks. | [CI scopes](https://github.com/OpenWhispr/openwhispr/blob/2516e6e000b866a06099f69fd851b914069653d4/.github/workflows/ci-changes.yml) |
 
 ## Changes in this pass
 
@@ -73,9 +73,10 @@ This is a source-level comparison, not a benchmark of OpenWhispr's runtime. Upst
 5. **Terminology controls implemented.** Explicit bounded vocabulary, exact casing, import/export,
    individual correction removal and relevant hints are in place. Recognition bias remains
    deferred because the documented Apple API is for a different recognizer module.
-6. **Continuous verification implemented.** macOS/iOS CI, bundle/license checks, isolated UI
-   previews, explicit hardware skips and a local evaluation harness are in place. The workflow
-   is not yet run on GitHub. Real speech corpus, signed-app compatibility, translation review,
+6. **Local verification implemented.** `Scripts/check.sh` and a pre-push hook run macOS/iOS
+   suites and bundle/license checks. Isolated UI previews, explicit hardware skips and a local
+   evaluation harness are in place. GitHub Actions is disabled. Real speech corpus, signed-app
+   compatibility, translation review,
    updater/notarization trials and publishing the corrected privacy mirror remain release work.
 7. **Additional product features remain decisions.** Alternative ASR, calibrated VAD/AEC, speaker
    fingerprints, automatic meeting prompts, summaries, translation and selection editing require

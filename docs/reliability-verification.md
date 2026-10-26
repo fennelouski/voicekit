@@ -44,13 +44,68 @@ The provider policy follows [OpenAI's request reference](https://developers.open
 and [Claude effort support](https://platform.claude.com/docs/en/build-with-claude/effort).
 The vocabulary distinction follows [Apple's contextualStrings documentation](https://developer.apple.com/documentation/speech/analysiscontext/contextualstrings).
 
-## Continuous and local checks
+## Local Apple platform checks
 
-`.github/workflows/ci.yml` runs separate macOS SwiftPM/bundle and iOS keyboard simulator jobs.
-It uses read-only repository permission, a pinned checkout action, and no signing/cloud secrets.
-Hosted macOS 26 runners provide the required SDK generation; see
-[GitHub's runner announcement](https://github.blog/changelog/2026-02-26-macos-26-is-now-generally-available-for-github-hosted-runners/).
-The workflow has been created locally; it has not yet executed on GitHub.
+`Scripts/check.sh` is the verification entrypoint. It runs directly on a development Mac and
+requires macOS 26+, Xcode 26+, Python 3, XcodeGen (`brew install xcodegen`), and an installed
+iOS 26+ iPhone simulator. Package resolution may download source dependencies on a fresh
+checkout. No hosted CI service, GitHub Actions minutes, billing setup, cloud secrets, or
+paid signing certificate is required.
+
+```sh
+Scripts/check.sh        # both platforms; the pre-push hook runs this command
+Scripts/check.sh macos  # desktop suites, bundle validation, timing-report tests
+Scripts/check.sh ios    # generate the project and run keyboard tests on a simulator
+```
+
+Every run checks shell syntax and staged/unstaged whitespace, records the commit and dirty
+working-tree status, and saves `check.log` plus `summary.txt` in a unique directory under
+`build/checks/`. A failed step returns a nonzero exit status and names the failing step in the
+summary. A platform-specific pass covers only that platform. The default full run covers:
+
+- macOS deterministic SwiftPM suites, with hardware/ASR tests disabled.
+- Debug app assembly with ad-hoc signing, bundle signature/structure/permission/license/localization validation.
+- The Python timing-report regression suite, retained from the former workflow.
+- XcodeGen project generation and iOS keyboard simulator tests with signing disabled.
+
+The versioned `.githooks/pre-push` hook blocks pushes if the full local check fails. Enable it
+once for each clone (configured in this working repository on October 26, 2026):
+
+```sh
+git config --local core.hooksPath .githooks
+```
+
+The checks use the current working tree, including uncommitted files; the report records that
+state. They do not certify a different revision being pushed. Run from the intended checkout
+before pushing. Microphone/ASR measurements remain a separate explicit opt-in below.
+
+GitHub Actions has been retired for this project. The hosted workflow was disabled on
+October 26, 2026, and its original configuration is retained for reference at
+[`.github/disabled-workflows/apple-platform-checks.yml`](../.github/disabled-workflows/apple-platform-checks.yml),
+outside the active workflows directory. The earlier
+[hosted run](https://github.com/fennelouski/voicekit/actions/runs/38617069096) stopped before
+assigning runners; local verification replaces that dependency entirely.
+
+### Local entrypoint verification (October 26, 2026)
+
+`Scripts/check.sh` completed both platforms with Xcode 27.1 / Swift 6.4: 261 macOS tests
+passed, four hardware/ASR tests were explicitly skipped, all three Python tests passed, and
+all seven iOS keyboard tests passed on iOS 27.1. The ad-hoc app bundle passed validation for
+signature, structure, permission disclosures, licenses, and all 40 locales. Shell syntax and
+both whitespace checks passed. The report is in `build/checks/20261026T175558Z-e5F2fd/`.
+Invoking the pre-push hook with XcodeGen absent from PATH returned exit 1 at preflight and
+saved a failure summary, verifying that prerequisite failures block the hook.
+
+### Local CI-equivalent rerun (October 18, 2026)
+
+With Xcode 27.1 / Swift 6.4, `swift test` reported 265 tests across the three test targets:
+261 passed and four opt-in hardware/ASR tests were skipped. The debug app built with ad-hoc
+signing and passed bundle validation, including all 40 locales. All three Python timing-report
+tests passed. XcodeGen generated the iOS project, and `Scripts/test-ios.sh` passed all seven
+keyboard tests on an iPhone 18 Pro with iOS 27.0, with signing disabled. Workflow validation
+with actionlint 1.7.12, shell syntax checks, and `git diff --check` passed. This historical run
+preceded the move to the local verification entrypoint. The earlier record below is retained
+for context.
 
 ```sh
 swift test
@@ -87,7 +142,7 @@ VOICEKIT_HARDWARE_TESTS=1 swift test --filter 'LiveCaptureRecoveryTests|FileTran
 Use an already authorized Mac, installed speech assets, an unmuted speaker/microphone loopback,
 and an idle microphone. These tests can synthesize audible speech, open hardware, create a
 private aggregate device, and download missing Apple speech assets. Missing opted-in prerequisites
-produce an issue instead of being counted as measured recovery. They are not run by default CI.
+produce an issue instead of being counted as measured recovery. They are not run by the default local checks.
 
 ## Reproducible speech evaluation
 

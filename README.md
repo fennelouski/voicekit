@@ -259,8 +259,13 @@ MIT — see [LICENSE](LICENSE).
 
 ## Reliability verification
 
-Run `swift test` for deterministic regressions; microphone/ASR integration is explicitly
-opt-in with `VOICEKIT_HARDWARE_TESTS=1`. Separate macOS and iOS CI, isolated UI previews,
-bundle validation, and a local `VoiceKitEvaluate` tool are documented in
+Run `Scripts/check.sh` on your Mac for macOS regression tests, app bundle validation, timing-report
+tests, and iOS keyboard simulator tests. Use `Scripts/check.sh macos` or `Scripts/check.sh ios`
+for one platform. Logs and a pass/fail summary stay in `build/checks/`. Install the local
+pre-push gate once per clone with `git config --local core.hooksPath .githooks`.
+
+Verification runs locally; GitHub Actions is disabled. Requires Xcode 26+, XcodeGen, Python 3,
+and an iOS 26+ iPhone simulator. Microphone/ASR integration is explicitly opt-in with
+`VOICEKIT_HARDWARE_TESTS=1`. Isolated UI previews and the local `VoiceKitEvaluate` tool are documented in
 [reliability verification](docs/reliability-verification.md). That document records measured
 results and remaining app compatibility, speech corpus, localization, and release checks.
